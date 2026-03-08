@@ -165,45 +165,46 @@ Building a Trello-inspired task management app from scratch.
 
 ## Phase 5: Board CRUD Operations
 
-**Goal:** Implement create, read, update, archive for boards.
+**Goal:** Implement create, read, update, archive, restore, and delete for boards.
 
 ### Tasks
-1. Create Zustand store
+1. Create board utilities
+   - `src/lib/backgrounds.ts`
+   - `src/lib/boards.ts`
+   - Background definitions and board form validation helpers
+
+2. Create board data layer
+   - `src/actions/boards.ts`
+   - `src/lib/board-queries.ts`
+   - Board create, update, archive, restore, delete, and list queries
+
+3. Create Zustand board store
    - `src/store/boardStore.ts`
    - boards, archivedBoards, currentBoard, isLoading, error
-   - fetchBoards, createBoard, updateBoard, archiveBoard, restoreBoard
-
-2. Create board server actions
-   - `src/actions/boards.ts`
-   - createBoard, updateBoard, archiveBoard, restoreBoard, deleteBoard
-
-3. Create board API route
-   - `src/app/api/boards/route.ts` - GET all boards
+   - replaceBoardSnapshot, createBoard, updateBoard, archiveBoard, restoreBoard, deleteBoard
 
 4. Create board components
-   - `src/components/board/BoardCard.tsx` - Card in grid
-   - `src/components/board/BoardGrid.tsx` - Grid layout
-   - `src/components/board/CreateBoardDialog.tsx` - Create modal with color/gradient picker
+   - `src/components/board/BoardCard.tsx`
+   - `src/components/board/BoardGrid.tsx`
+   - `src/components/board/CreateBoardDialog.tsx`
+   - `src/components/shared/ConfirmDialog.tsx`
 
-5. Create background constants
-   - `src/lib/backgrounds.ts` - BOARD_BACKGROUNDS object
-
-6. Implement boards list page
+5. Implement boards page
    - `src/app/(dashboard)/boards/page.tsx`
-   - Fetch and display boards
-   - Create new board button
-   - Link to archived boards
+   - `src/components/board/BoardsPageClient.tsx`
+   - Load boards, hydrate the store, create boards, edit boards, archive boards, and link to archived boards
 
-7. Create archived boards page
+6. Implement archived boards page
    - `src/app/(dashboard)/archived/page.tsx`
-   - Show archived boards
-   - Restore/delete permanently
+   - `src/components/board/ArchivedBoardsPageClient.tsx`
+   - Show archived boards, restore boards, and permanently delete boards
 
 ### Verification
-- Can create board with title and background
-- Boards display in grid
-- Can edit board title
+- Can create a board with a title and background
+- Boards display in a grid on `/boards`
+- Can edit board title and background
 - Can archive and restore boards
+- Can permanently delete archived boards
 
 ---
 
@@ -471,7 +472,6 @@ Building a Trello-inspired task management app from scratch.
 - `src/actions/boards.ts`
 - `src/actions/lists.ts`
 - `src/actions/cards.ts`
-- `src/app/api/boards/route.ts`
 - `src/app/api/boards/[boardId]/route.ts`
 
 ### DnD (Phase 8)
