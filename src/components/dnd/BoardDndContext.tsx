@@ -435,12 +435,12 @@ export default function BoardDndContext({ lists, children }: BoardDndContextProp
 
       <DragOverlay>
         {activeCard ? (
-          <div className="rotate-3 shadow-xl">
+          <div className="pointer-events-none rotate-[2.5deg] scale-[1.02] shadow-2xl">
             <TaskCard card={activeCard} onOpen={() => {}} />
           </div>
         ) : null}
         {activeList ? (
-          <div className="w-[272px] rotate-2 rounded-xl bg-[#f1f2f4]/96 p-3 shadow-[0_1px_1px_rgba(15,23,42,0.12),0_12px_28px_rgba(15,23,42,0.16)]">
+          <div className="pointer-events-none w-[272px] rotate-[1.75deg] rounded-xl bg-[#f1f2f4]/96 p-3 shadow-[0_1px_1px_rgba(15,23,42,0.12),0_16px_34px_rgba(15,23,42,0.18)] ring-1 ring-sky-400/25">
             <p className="text-sm font-semibold text-slate-800">{activeList.title}</p>
             <p className="mt-1 text-xs text-slate-500">
               {activeList.cards.length} card{activeList.cards.length !== 1 ? "s" : ""}
