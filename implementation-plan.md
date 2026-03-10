@@ -339,7 +339,7 @@ Building a Trello-inspired task management app from scratch.
 
 ---
 
-## Phase 9: Real-time Subscriptions
+## Phase 9: Real-time Subscriptions (skipped for now)
 
 **Goal:** Implement live updates when data changes.
 
