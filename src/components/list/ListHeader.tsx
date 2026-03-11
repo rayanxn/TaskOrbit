@@ -1,10 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { MoreHorizontal, PencilLine, Trash2 } from "lucide-react";
+import { Archive, Copy, MoreHorizontal, MoveHorizontal, PencilLine, Trash2 } from "lucide-react";
 
 import { getListTitleError } from "@/lib/lists";
 import type { ListWithCards } from "@/types";
+import ListActionDialog from "@/components/list/ListActionDialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -17,17 +18,37 @@ import ConfirmDialog from "@/components/shared/ConfirmDialog";
 
 interface ListHeaderProps {
   list: ListWithCards;
+  lists: ListWithCards[];
+  canEdit?: boolean;
   onUpdateTitle: (title: string) => Promise<void>;
+  onMove: (position: string) => Promise<void>;
+  onCopy: (title: string, position: string) => Promise<void>;
+  onArchive: () => Promise<void>;
   onDelete: () => Promise<void>;
 }
 
-export default function ListHeader({ list, onUpdateTitle, onDelete }: ListHeaderProps) {
+export default function ListHeader({
+  list,
+  lists,
+  canEdit = true,
+  onUpdateTitle,
+  onMove,
+  onCopy,
+  onArchive,
+  onDelete,
+}: ListHeaderProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(list.title);
+  const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [actionMode, setActionMode] = useState<"move" | "copy" | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const startEditing = () => {
+    if (!canEdit) {
+      return;
+    }
+
     setEditValue(list.title);
     setIsEditing(true);
     setTimeout(() => inputRef.current?.select(), 0);
@@ -84,42 +105,75 @@ export default function ListHeader({ list, onUpdateTitle, onDelete }: ListHeader
           <button
             type="button"
             onClick={startEditing}
-            className="min-w-0 flex-1 cursor-pointer truncate rounded-md px-1 py-1 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-300/50"
+            disabled={!canEdit}
+            className={`min-w-0 flex-1 truncate rounded-md px-1 py-1 text-left text-sm font-semibold text-slate-800 transition ${
+              canEdit ? "cursor-pointer hover:bg-slate-300/50" : "cursor-default"
+            }`}
           >
             {list.title}
           </button>
         )}
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 shrink-0 rounded-full text-slate-500 hover:bg-slate-300/60 hover:text-slate-700"
-              aria-label={`Actions for ${list.title}`}
-            >
-              <MoreHorizontal className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem onSelect={startEditing}>
-              <PencilLine className="size-4" />
-              Rename list
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              variant="destructive"
-              onSelect={(event) => {
-                event.preventDefault();
-                setIsDeleteConfirmOpen(true);
-              }}
-            >
-              <Trash2 className="size-4" />
-              Delete list
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {canEdit ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 shrink-0 rounded-full text-slate-500 hover:bg-slate-300/60 hover:text-slate-700"
+                aria-label={`Actions for ${list.title}`}
+              >
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onSelect={() => setActionMode("move")}>
+                <MoveHorizontal className="size-4" />
+                Move list
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setActionMode("copy")}>
+                <Copy className="size-4" />
+                Copy list
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={startEditing}>
+                <PencilLine className="size-4" />
+                Rename list
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault();
+                  setIsArchiveConfirmOpen(true);
+                }}
+              >
+                <Archive className="size-4" />
+                Archive list
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={(event) => {
+                  event.preventDefault();
+                  setIsDeleteConfirmOpen(true);
+                }}
+              >
+                <Trash2 className="size-4" />
+                Delete list
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
       </div>
+
+      <ConfirmDialog
+        open={isArchiveConfirmOpen}
+        onOpenChange={setIsArchiveConfirmOpen}
+        title="Archive list?"
+        description={`"${list.title}" will be removed from the board but can be restored later.`}
+        confirmLabel="Archive list"
+        onConfirm={onArchive}
+      />
 
       <ConfirmDialog
         open={isDeleteConfirmOpen}
@@ -130,6 +184,22 @@ export default function ListHeader({ list, onUpdateTitle, onDelete }: ListHeader
         confirmVariant="destructive"
         onConfirm={onDelete}
       />
+
+      {actionMode ? (
+        <ListActionDialog
+          open={Boolean(actionMode)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setActionMode(null);
+            }
+          }}
+          mode={actionMode}
+          list={list}
+          lists={lists}
+          onMove={onMove}
+          onCopy={onCopy}
+        />
+      ) : null}
     </>
   );
 }

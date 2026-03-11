@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Task Orbit",
-  description: "A Trello-inspired task management application",
+  description: "A task management application",
 };
 
 export default function RootLayout({

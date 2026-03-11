@@ -11,10 +11,16 @@ import { cn } from "@/lib/utils";
 interface SortableCardProps {
   card: CardRecord;
   listId: string;
+  canEditContent?: boolean;
   onOpen: () => void;
 }
 
-export default function SortableCard({ card, listId, onOpen }: SortableCardProps) {
+export default function SortableCard({
+  card,
+  listId,
+  canEditContent = true,
+  onOpen,
+}: SortableCardProps) {
   const { active, over } = useDndContext();
   const {
     attributes,
@@ -26,6 +32,7 @@ export default function SortableCard({ card, listId, onOpen }: SortableCardProps
   } = useSortable({
     id: `card:${card.id}`,
     data: { type: "card", listId },
+    disabled: !canEditContent,
   });
 
   const style = {
@@ -57,7 +64,7 @@ export default function SortableCard({ card, listId, onOpen }: SortableCardProps
         card={card}
         onOpen={onOpen}
         isDragTarget={isCardDropTarget}
-        isDraggingHint
+        isDraggingHint={canEditContent}
       />
     </div>
   );

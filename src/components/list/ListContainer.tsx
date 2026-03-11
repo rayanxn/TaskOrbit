@@ -2,24 +2,36 @@
 
 import { useMemo, useState } from "react";
 
-import type { Card as CardRecord, CardUpdatePatch } from "@/types";
+import type { Card as CardRecord, CardUpdatePatch, ListWithCards } from "@/types";
 import AddCardInput from "@/components/card/AddCardInput";
 import CardModal from "@/components/card/CardModal";
 import TaskCard from "@/components/card/Card";
 
 interface ListContainerProps {
+  lists?: ListWithCards[];
+  boardId?: string;
+  currentUserId?: string;
   listId: string;
   cards: CardRecord[];
   onAddCard: (title: string) => Promise<void>;
+  onMoveCard?: (cardId: string, listId: string, position: string) => Promise<void>;
+  onCopyCard?: (cardId: string, title: string, listId: string, position: string) => Promise<void>;
   onUpdateCard: (cardId: string, input: CardUpdatePatch) => Promise<void>;
+  onArchiveCard?: (cardId: string) => Promise<void>;
   onDeleteCard: (cardId: string) => Promise<void>;
 }
 
 export default function ListContainer({
+  lists = [],
+  boardId = "",
+  currentUserId = "",
   listId,
   cards,
   onAddCard,
+  onMoveCard = async () => {},
+  onCopyCard = async () => {},
   onUpdateCard,
+  onArchiveCard = async () => {},
   onDeleteCard,
 }: ListContainerProps) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -50,7 +62,13 @@ export default function ListContainer({
             setSelectedCardId(null);
           }
         }}
+        lists={lists}
+        boardId={boardId}
+        currentUserId={currentUserId}
+        onMove={onMoveCard}
+        onCopy={onCopyCard}
         onUpdate={onUpdateCard}
+        onArchive={onArchiveCard}
         onDelete={onDeleteCard}
       />
     </>

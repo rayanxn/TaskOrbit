@@ -14,27 +14,49 @@ import { cn } from "@/lib/utils";
 
 interface SortableListProps {
   list: ListWithCards;
+  lists: ListWithCards[];
+  boardId: string;
+  currentUserId: string;
+  canEditContent?: boolean;
+  canDragContent?: boolean;
   onUpdateTitle: (title: string) => Promise<void>;
+  onMoveList: (position: string) => Promise<void>;
+  onCopyList: (title: string, position: string) => Promise<void>;
+  onArchiveList: () => Promise<void>;
   onDelete: () => Promise<void>;
   onAddCard: (title: string) => Promise<void>;
+  onMoveCard: (cardId: string, listId: string, position: string) => Promise<void>;
+  onCopyCard: (cardId: string, title: string, listId: string, position: string) => Promise<void>;
   onUpdateCard: (cardId: string, input: CardUpdatePatch) => Promise<void>;
+  onArchiveCard: (cardId: string) => Promise<void>;
   onDeleteCard: (cardId: string) => Promise<void>;
 }
 
 export default function SortableList({
   list,
+  lists,
+  boardId,
+  currentUserId,
+  canEditContent = true,
+  canDragContent = true,
   onUpdateTitle,
+  onMoveList,
+  onCopyList,
+  onArchiveList,
   onDelete,
   onAddCard,
+  onMoveCard,
+  onCopyCard,
   onUpdateCard,
+  onArchiveCard,
   onDeleteCard,
 }: SortableListProps) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const { active, over } = useDndContext();
 
   const selectedCard = useMemo(
-    () => list.cards.find((card) => card.id === selectedCardId) ?? null,
-    [list.cards, selectedCardId]
+    () => lists.flatMap((item) => item.cards).find((card) => card.id === selectedCardId) ?? null,
+    [lists, selectedCardId]
   );
 
   const {
@@ -47,6 +69,7 @@ export default function SortableList({
   } = useSortable({
     id: `list:${list.id}`,
     data: { type: "list" },
+    disabled: !canDragContent,
   });
 
   const { setNodeRef: setDroppableRef } = useDroppable({
@@ -92,9 +115,18 @@ export default function SortableList({
         <div
           {...attributes}
           {...listeners}
-          className="cursor-grab active:cursor-grabbing"
+          className={cn(canDragContent && "cursor-grab active:cursor-grabbing")}
         >
-          <ListHeader list={list} onUpdateTitle={onUpdateTitle} onDelete={onDelete} />
+          <ListHeader
+            list={list}
+            lists={lists}
+            canEdit={canEditContent}
+            onUpdateTitle={onUpdateTitle}
+            onMove={onMoveList}
+            onCopy={onCopyList}
+            onArchive={onArchiveList}
+            onDelete={onDelete}
+          />
         </div>
 
         <div ref={setDroppableRef} className="min-h-0 flex-1">
@@ -110,10 +142,11 @@ export default function SortableList({
                   key={card.id}
                   card={card}
                   listId={list.id}
+                  canEditContent={canDragContent}
                   onOpen={() => setSelectedCardId(card.id)}
                 />
               ))}
-              <AddCardInput onAdd={onAddCard} />
+              {canEditContent ? <AddCardInput onAdd={onAddCard} /> : null}
             </div>
           </SortableContext>
         </div>
@@ -127,7 +160,14 @@ export default function SortableList({
             setSelectedCardId(null);
           }
         }}
+        lists={lists}
+        boardId={boardId}
+        currentUserId={currentUserId}
+        canEditContent={canEditContent}
+        onMove={onMoveCard}
+        onCopy={onCopyCard}
         onUpdate={onUpdateCard}
+        onArchive={onArchiveCard}
         onDelete={onDeleteCard}
       />
     </>

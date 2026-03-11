@@ -27,6 +27,7 @@ import TaskCard from "@/components/card/Card";
 
 interface BoardDndContextProps {
   lists: ListWithCards[];
+  canEditContent?: boolean;
   children: React.ReactNode;
 }
 
@@ -210,7 +211,11 @@ function getListDestination(
   return calculatePositionFromTarget(items, activeListId, overListId, insertAfter);
 }
 
-export default function BoardDndContext({ lists, children }: BoardDndContextProps) {
+export default function BoardDndContext({
+  lists,
+  canEditContent = true,
+  children,
+}: BoardDndContextProps) {
   const [activeItem, setActiveItem] = useState<ActiveItem | null>(null);
   const activeSnapshotRef = useRef<ActiveSnapshot | null>(null);
 
@@ -424,22 +429,22 @@ export default function BoardDndContext({ lists, children }: BoardDndContextProp
       id="board-dnd-context"
       sensors={sensors}
       collisionDetection={closestCorners}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-      onDragCancel={handleDragCancel}
+      onDragStart={canEditContent ? handleDragStart : undefined}
+      onDragOver={canEditContent ? handleDragOver : undefined}
+      onDragEnd={canEditContent ? handleDragEnd : undefined}
+      onDragCancel={canEditContent ? handleDragCancel : undefined}
     >
       <SortableContext items={listIds} strategy={horizontalListSortingStrategy}>
         {children}
       </SortableContext>
 
       <DragOverlay>
-        {activeCard ? (
+        {canEditContent && activeCard ? (
           <div className="pointer-events-none rotate-[2.5deg] scale-[1.02] shadow-2xl">
             <TaskCard card={activeCard} onOpen={() => {}} />
           </div>
         ) : null}
-        {activeList ? (
+        {canEditContent && activeList ? (
           <div className="pointer-events-none w-[272px] rotate-[1.75deg] rounded-xl bg-[#f1f2f4]/96 p-3 shadow-[0_1px_1px_rgba(15,23,42,0.12),0_16px_34px_rgba(15,23,42,0.18)] ring-1 ring-sky-400/25">
             <p className="text-sm font-semibold text-slate-800">{activeList.title}</p>
             <p className="mt-1 text-xs text-slate-500">

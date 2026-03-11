@@ -27,10 +27,12 @@ export async function getBoardWithLists(
 
   const board = data as BoardWithDetails;
 
-  board.lists = sortByPosition(board.lists).map((list) => ({
-    ...list,
-    cards: sortByPosition(list.cards),
-  }));
+  board.lists = sortByPosition(board.lists)
+    .filter((list) => list.is_archived !== true)
+    .map((list) => ({
+      ...list,
+      cards: sortByPosition(list.cards).filter((card) => card.is_archived !== true),
+    }));
 
   return board;
 }

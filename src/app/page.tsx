@@ -61,9 +61,8 @@ export default async function Home() {
           Organize your work, one board at a time
         </h1>
         <p className="mt-6 max-w-2xl text-lg text-muted-foreground">
-          Task Orbit is a simple, fast, and beautiful task management app
-          inspired by Trello. Create boards, add lists, and track your
-          progress with ease.
+          Task Orbit is a simple, fast, and beautiful task management app.
+          Create boards, add lists, and track your progress with ease.
         </p>
         <div className="mt-10 flex gap-4">
           <Button size="lg" asChild>
