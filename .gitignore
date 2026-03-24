@@ -50,3 +50,8 @@ node_modules/
 /playwright/.auth/
 playwright/.auth/
 tests/.auth/
+
+# Screenshots & artifacts
+*.png
+.playwright-cli/
+.claude/worktrees/
