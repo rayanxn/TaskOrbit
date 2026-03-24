@@ -81,8 +81,6 @@ export function NotificationRow({
         </span>
         {isUnread && (
           <span
-            role="button"
-            tabIndex={0}
             className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-surface-hover"
             title="Mark as read"
           >
