@@ -3,6 +3,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils/cn";
+import { getInitials } from "@/lib/utils/format";
 import { PRIORITY_CONFIG } from "@/lib/utils/priorities";
 import { formatDate } from "@/lib/utils/dates";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -24,16 +25,6 @@ export interface BoardCardProps {
   projectColor?: string;
   isDragOverlay?: boolean;
   onClick?: (id: string) => void;
-}
-
-function getInitials(name: string | null): string {
-  if (!name) return "?";
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 }
 
 export function BoardCard({
