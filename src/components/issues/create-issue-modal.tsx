@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
+import { toast } from "sonner";
 import { useWorkspace } from "@/providers/workspace-provider";
 import { createIssue } from "@/lib/actions/issues";
 import {
@@ -17,12 +18,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils/cn";
 import { PRIORITY_CONFIG } from "@/lib/utils/priorities";
-import type { IssuePriority } from "@/lib/types";
+import { STATUS_CONFIG, STATUS_ORDER } from "@/lib/utils/statuses";
+import type { IssuePriority, IssueStatus } from "@/lib/types";
 
 interface CreateIssueModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultProjectId?: string;
+  defaultAssigneeId?: string;
+  defaultStatus?: IssueStatus;
   projects?: { id: string; name: string; color: string }[];
   members?: { user_id: string; profile: { full_name: string | null; email: string } }[];
   sprints?: { id: string; name: string; status: string }[];
@@ -34,6 +38,8 @@ export function CreateIssueModal({
   open,
   onOpenChange,
   defaultProjectId,
+  defaultAssigneeId,
+  defaultStatus,
   projects = [],
   members = [],
   sprints = [],
@@ -42,7 +48,8 @@ export function CreateIssueModal({
 }: CreateIssueModalProps) {
   const router = useRouter();
   const { workspace } = useWorkspace();
-  const [priority, setPriority] = useState<IssuePriority>(0);
+  const [priority, setPriority] = useState<IssuePriority>(3);
+  const [status, setStatus] = useState<IssueStatus>(defaultStatus ?? "todo");
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +65,7 @@ export function CreateIssueModal({
       const formData = new FormData(form);
       formData.set("workspaceId", workspace.id);
       formData.set("priority", String(priority));
+      formData.set("status", status);
       formData.set("labelIds", selectedLabels.join(","));
       formData.set("sortOrder", String(initialSortOrder));
 
@@ -71,17 +79,22 @@ export function CreateIssueModal({
 
       setLoading(false);
       onOpenChange(false);
-      setPriority(0);
+      setPriority(3);
+      setStatus(defaultStatus ?? "todo");
       setSelectedLabels([]);
+      if ("data" in result && result.data) {
+        toast.success(`Issue ${result.data.issue_key} created`);
+      }
       router.refresh();
     },
-    [workspace.id, priority, selectedLabels, onOpenChange, router],
+    [workspace.id, priority, status, selectedLabels, defaultStatus, onOpenChange, router],
   );
 
   // Reset state on open
   useEffect(() => {
     if (open) {
-      setPriority(0);
+      setPriority(3);
+      setStatus(defaultStatus ?? "todo");
       setSelectedLabels([]);
       setError(null);
       setShowLabelPicker(false);
@@ -145,7 +158,7 @@ export function CreateIssueModal({
                   id="issue-assignee"
                   name="assigneeId"
                   className="flex h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-border-strong transition-colors"
-                  defaultValue=""
+                  defaultValue={defaultAssigneeId ?? ""}
                 >
                   <option value="">Unassigned</option>
                   {members.map((m) => (
@@ -183,6 +196,36 @@ export function CreateIssueModal({
                     );
                   })}
                 </div>
+              </div>
+            </div>
+
+            {/* Status */}
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <div className="flex items-center gap-1">
+                {STATUS_ORDER.map((s) => {
+                  const config = STATUS_CONFIG[s];
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setStatus(s)}
+                      className={cn(
+                        "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+                        status === s
+                          ? "text-white"
+                          : "text-text-secondary bg-surface-hover hover:bg-border",
+                      )}
+                      style={
+                        status === s
+                          ? { backgroundColor: config.color }
+                          : undefined
+                      }
+                    >
+                      {config.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

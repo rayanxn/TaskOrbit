@@ -39,7 +39,7 @@ export function BoardColumn({
 
   // Sort order for new quick-add issue: after the last issue
   const lastSortOrder =
-    issues.length > 0 ? issues[issues.length - 1].sort_order + 1 : 1;
+    issues.length > 0 ? issues[issues.length - 1].sort_order + 1000 : 1000;
 
   return (
     <div

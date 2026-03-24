@@ -10,6 +10,7 @@ interface MyIssuesClientProps {
   members: { user_id: string; profile: { full_name: string | null; email: string } }[];
   sprints: { id: string; name: string; status: string }[];
   labels: { id: string; name: string; color: string }[];
+  defaultAssigneeId?: string;
 }
 
 export function MyIssuesClient({
@@ -17,6 +18,7 @@ export function MyIssuesClient({
   members,
   sprints,
   labels,
+  defaultAssigneeId,
 }: MyIssuesClientProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -33,6 +35,7 @@ export function MyIssuesClient({
         members={members}
         sprints={sprints}
         labels={labels}
+        defaultAssigneeId={defaultAssigneeId}
       />
     </>
   );

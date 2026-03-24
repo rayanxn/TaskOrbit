@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceBySlug } from "@/lib/queries/workspaces";
 import { getMyIssues } from "@/lib/queries/issues";
 import { getWorkspaceMembers } from "@/lib/queries/members";
+import { getWorkspaceProjects } from "@/lib/queries/workspaces";
 import { IssueList } from "@/components/issues/issue-list";
 import { MyIssuesClient } from "./my-issues-client";
 
@@ -23,15 +24,11 @@ export default async function MyIssuesPage({
 
   if (!user) notFound();
 
-  const [issues, members] = await Promise.all([
+  const [issues, members, projects] = await Promise.all([
     getMyIssues(result.workspace.id, user.id),
     getWorkspaceMembers(result.workspace.id),
+    getWorkspaceProjects(result.workspace.id),
   ]);
-
-  const projects = issues
-    .map((i) => i.project)
-    .filter((p): p is { id: string; name: string; color: string } => p !== null)
-    .filter((p, i, arr) => arr.findIndex((a) => a.id === p.id) === i);
 
   const labels: never[] = [];
   const sprints: never[] = [];
@@ -54,6 +51,7 @@ export default async function MyIssuesPage({
             members={members}
             sprints={sprints}
             labels={labels}
+            defaultAssigneeId={user.id}
           />
           <div className="flex items-center rounded-lg overflow-hidden bg-[#EDEAE4] p-0.5 gap-0.5">
             <button className="px-3.5 py-1.5 text-sm font-medium bg-white text-text rounded-md">
