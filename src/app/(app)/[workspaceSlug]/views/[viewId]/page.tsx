@@ -32,7 +32,12 @@ export default async function ViewDetailPage({
 
   // If search params have filter overrides, use those instead
   const hasOverrides =
-    resolvedSearchParams.status || resolvedSearchParams.priority;
+    resolvedSearchParams.status ||
+    resolvedSearchParams.priority ||
+    resolvedSearchParams.assignee_ids ||
+    resolvedSearchParams.project_ids ||
+    resolvedSearchParams.due_from ||
+    resolvedSearchParams.due_to;
 
   let activeFilters: ViewFilters;
   if (hasOverrides) {
@@ -48,6 +53,26 @@ export default async function ViewDetailPage({
         ? resolvedSearchParams.priority
         : resolvedSearchParams.priority.split(",");
       activeFilters.priority = raw.map(Number) as ViewFilters["priority"];
+    }
+    if (resolvedSearchParams.assignee_ids) {
+      const raw = Array.isArray(resolvedSearchParams.assignee_ids)
+        ? resolvedSearchParams.assignee_ids
+        : resolvedSearchParams.assignee_ids.split(",");
+      activeFilters.assignee_ids = raw;
+    }
+    if (resolvedSearchParams.project_ids) {
+      const raw = Array.isArray(resolvedSearchParams.project_ids)
+        ? resolvedSearchParams.project_ids
+        : resolvedSearchParams.project_ids.split(",");
+      activeFilters.project_ids = raw;
+    }
+    if (resolvedSearchParams.due_from || resolvedSearchParams.due_to) {
+      const from = resolvedSearchParams.due_from;
+      const to = resolvedSearchParams.due_to;
+      activeFilters.due_date_range = {
+        from: typeof from === "string" ? from : undefined,
+        to: typeof to === "string" ? to : undefined,
+      };
     }
   } else {
     activeFilters = storedFilters;
