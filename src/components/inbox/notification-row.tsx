@@ -6,6 +6,8 @@ import { formatActivityAction } from "@/lib/utils/activities";
 import { formatRelative } from "@/lib/utils/dates";
 import { markNotificationRead } from "@/lib/actions/notifications";
 import { cn } from "@/lib/utils/cn";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { getInitials } from "@/lib/utils/format";
 
 interface NotificationRowProps {
   notification: NotificationWithActivity;
@@ -47,7 +49,11 @@ export function NotificationRow({
       )}
     >
       {/* Avatar */}
-      <div className="shrink-0 rounded-full bg-[#C4C0B8] size-8" />
+      <Avatar size="sm" className="shrink-0 size-8">
+        <AvatarFallback>
+          {getInitials(activity?.actor?.full_name, activity?.actor?.email)}
+        </AvatarFallback>
+      </Avatar>
 
       {/* Content */}
       <div className="flex-1 min-w-0 flex flex-col gap-0.5">
