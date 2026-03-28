@@ -51,6 +51,9 @@ node_modules/
 playwright/.auth/
 tests/.auth/
 
+# design mockups
+/design/
+
 # Screenshots & artifacts
 *.png
 .playwright-cli/
