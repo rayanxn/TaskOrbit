@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   DndContext,
@@ -19,7 +20,6 @@ import { Plus, Search, ChevronDown, X } from "lucide-react";
 import { format } from "date-fns";
 import { updateIssue } from "@/lib/actions/issues";
 import { startSprint } from "@/lib/actions/sprints";
-import { formatDateFull } from "@/lib/utils/dates";
 import { PRIORITY_CONFIG } from "@/lib/utils/priorities";
 import { cn } from "@/lib/utils/cn";
 import { getInitials } from "@/lib/utils/format";
@@ -44,6 +44,7 @@ import type { WorkspaceMember } from "@/lib/queries/members";
 // --- Types ---
 
 interface SprintPlanningViewProps {
+  workspaceSlug: string;
   projectId: string;
   workspaceId: string;
   sprint: Tables<"sprints"> | null;
@@ -203,6 +204,7 @@ function DroppablePane({
 // --- Main Component ---
 
 export function SprintPlanningView({
+  workspaceSlug,
   projectId,
   workspaceId,
   sprint,
@@ -278,7 +280,6 @@ export function SprintPlanningView({
 
     return () => window.cancelAnimationFrame(syncFrame);
   }, [initialBacklogIssues, initialSprintIssues]);
-
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
@@ -339,11 +340,6 @@ export function SprintPlanningView({
   const doneIssues = useMemo(
     () => sprintIssues.filter((i) => i.status === "done"),
     [sprintIssues],
-  );
-
-  const donePoints = useMemo(
-    () => doneIssues.reduce((sum, i) => sum + (i.story_points ?? 0), 0),
-    [doneIssues],
   );
 
   const incompleteIssues = sprintIssues.length - doneIssues.length;
@@ -482,8 +478,10 @@ export function SprintPlanningView({
     const result = await startSprint(sprint.id);
     if (result.error) {
       setStartingError(result.error);
+      return;
     }
-  }, [sprint]);
+    router.refresh();
+  }, [router, sprint]);
 
   // --- Render ---
 
@@ -715,6 +713,13 @@ export function SprintPlanningView({
 
                   {/* Sprint actions */}
                   <div className="flex items-center gap-2 mt-3">
+                    {sprint.status === "active" && (
+                      <Button asChild size="sm" variant="ghost">
+                        <Link href={`/${workspaceSlug}/analytics?tab=sprints&sprint=${sprint.id}`}>
+                          Analytics
+                        </Link>
+                      </Button>
+                    )}
                     {sprint.status === "planning" && (
                       <Button
                         size="sm"
@@ -822,6 +827,7 @@ export function SprintPlanningView({
           open={showCompleteModal}
           onOpenChange={setShowCompleteModal}
           sprint={sprint}
+          workspaceSlug={workspaceSlug}
           totalIssues={sprintIssues.length}
           doneIssues={doneIssues.length}
           incompleteIssues={incompleteIssues}

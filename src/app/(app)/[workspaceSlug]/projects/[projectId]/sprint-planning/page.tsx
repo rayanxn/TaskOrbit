@@ -11,7 +11,7 @@ export default async function SprintPlanningPage({
   params: Promise<{ workspaceSlug: string; projectId: string }>;
   searchParams: Promise<{ sprint?: string }>;
 }) {
-  const [{ projectId }, resolvedSearchParams] = await Promise.all([
+  const [{ workspaceSlug, projectId }, resolvedSearchParams] = await Promise.all([
     params,
     searchParams,
   ]);
@@ -47,8 +47,16 @@ export default async function SprintPlanningPage({
     selectedSprint ? getSprintIssues(selectedSprint.id) : Promise.resolve([]),
   ]);
 
+  const planningViewKey = [
+    selectedSprint?.id ?? "no-sprint",
+    backlogIssues.map((issue) => issue.id).join(","),
+    sprintIssues.map((issue) => issue.id).join(","),
+  ].join(":");
+
   return (
     <SprintPlanningView
+      key={planningViewKey}
+      workspaceSlug={workspaceSlug}
       projectId={projectData.id}
       workspaceId={projectData.workspace_id}
       sprint={selectedSprint}
