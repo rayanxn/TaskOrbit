@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { updateProfile } from "@/lib/actions/profile";
 import { Switch } from "@/components/ui/switch";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Tables } from "@/lib/types";
 
 interface ProfileSettingsFormProps {
@@ -69,6 +69,12 @@ export function ProfileSettingsForm({ profile }: ProfileSettingsFormProps) {
         {/* Avatar */}
         <div className="flex items-center gap-4">
           <Avatar className="size-16">
+            {profile.avatar_url && (
+              <AvatarImage
+                src={profile.avatar_url}
+                alt={profile.full_name ?? profile.email}
+              />
+            )}
             <AvatarFallback className="text-lg">{initials}</AvatarFallback>
           </Avatar>
           <div>
