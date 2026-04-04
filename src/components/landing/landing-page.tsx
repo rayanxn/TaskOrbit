@@ -13,7 +13,7 @@ import { ScrollReveal } from "./scroll-reveal";
 
 export function LandingPage() {
   return (
-    <div className="relative min-h-screen bg-background">
+    <div className="landing-light relative min-h-screen bg-background">
       <SmoothScroll />
       <NoiseOverlay />
       <Navbar />
