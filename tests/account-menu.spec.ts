@@ -100,13 +100,13 @@ test.describe.serial("account menu", () => {
     await page.getByRole("button", { name: "Open account menu" }).click();
 
     await expect(page.getByText(TEST_EMAIL)).toBeVisible();
-    await expect(page.getByRole("link", { name: /Profile settings/i })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: /Profile settings/i })).toBeVisible();
     await expect(
-      page.getByRole("link", { name: /Playwright Switch Workspace/i })
+      page.getByRole("menuitem", { name: /Playwright Switch Workspace/i })
     ).toBeVisible();
     await expect(page.getByText("Current", { exact: true })).toBeVisible();
 
-    await page.getByRole("link", { name: /Playwright Switch Workspace/i }).click();
+    await page.getByRole("menuitem", { name: /Playwright Switch Workspace/i }).click();
 
     await expect(page).toHaveURL(`/${SWITCH_WORKSPACE_SLUG}/dashboard`);
     await expect(page.locator("aside")).toContainText(SWITCH_WORKSPACE_NAME);
