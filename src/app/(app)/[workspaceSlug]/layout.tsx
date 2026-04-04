@@ -6,6 +6,7 @@ import { getWorkspaceMembers } from "@/lib/queries/members";
 import { WorkspaceProvider } from "@/providers/workspace-provider";
 import { WorkspaceShell } from "@/components/layout/workspace-shell";
 import { LayoutShell } from "@/components/layout/layout-shell";
+import type { Tables } from "@/lib/types";
 
 export default async function WorkspaceLayout({
   children,
@@ -30,12 +31,36 @@ export default async function WorkspaceLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
+  const profilePromise = user
+    ? supabase
+        .from("profiles")
+        .select("full_name, email, avatar_url")
+        .eq("id", user.id)
+        .maybeSingle()
+    : null;
+  const userWorkspacesPromise = user
+    ? supabase
+        .from("workspace_members")
+        .select("role, workspace:workspaces!inner(id, name, slug)")
+        .eq("user_id", user.id)
+    : null;
+
+  const [unreadCount, members, profileResult, userWorkspacesResult] = await Promise.all([
+    user ? getUnreadNotificationCount(workspace.id, user.id) : 0,
+    getWorkspaceMembers(workspace.id),
+    profilePromise,
+    userWorkspacesPromise,
+  ]);
+
+  const profile = profileResult?.data ?? null;
   const userName =
-    typeof user?.user_metadata?.full_name === "string" &&
+    profile?.full_name?.trim() ||
+    (typeof user?.user_metadata?.full_name === "string" &&
     user.user_metadata.full_name.trim().length > 0
       ? user.user_metadata.full_name.trim()
-      : null;
-  const userEmail = user?.email ?? null;
+      : null);
+  const userEmail = profile?.email ?? user?.email ?? null;
+  const userAvatarUrl = profile?.avatar_url ?? null;
   const initials =
     userName
       ?.split(" ")
@@ -46,10 +71,18 @@ export default async function WorkspaceLayout({
     userEmail?.slice(0, 2).toUpperCase() ??
     "U";
 
-  const [unreadCount, members] = await Promise.all([
-    user ? getUnreadNotificationCount(workspace.id, user.id) : 0,
-    getWorkspaceMembers(workspace.id),
-  ]);
+  const workspaces = (
+    (userWorkspacesResult?.data ?? []) as Array<{
+      role: Tables<"workspace_members">["role"];
+      workspace: Pick<Tables<"workspaces">, "id" | "name" | "slug"> | null;
+    }>
+  )
+    .flatMap((membership) =>
+      membership.workspace
+        ? [{ role: membership.role, workspace: membership.workspace }]
+        : []
+    )
+    .sort((a, b) => a.workspace.name.localeCompare(b.workspace.name));
 
   const memberList = members.map((m) => ({
     user_id: m.user_id,
@@ -78,6 +111,8 @@ export default async function WorkspaceLayout({
           userInitials={initials}
           userName={userName}
           userEmail={userEmail}
+          userAvatarUrl={userAvatarUrl}
+          workspaces={workspaces}
         >
           {children}
         </LayoutShell>

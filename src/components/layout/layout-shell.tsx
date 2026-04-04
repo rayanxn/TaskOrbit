@@ -17,6 +17,11 @@ interface LayoutShellProps {
   userInitials: string;
   userName: string | null;
   userEmail: string | null;
+  userAvatarUrl: string | null;
+  workspaces: {
+    role: "owner" | "admin" | "member";
+    workspace: { id: string; name: string; slug: string };
+  }[];
   children: React.ReactNode;
 }
 
@@ -26,6 +31,8 @@ export function LayoutShell({
   userInitials,
   userName,
   userEmail,
+  userAvatarUrl,
+  workspaces,
   children,
 }: LayoutShellProps) {
   const shell = useShell();
@@ -44,6 +51,8 @@ export function LayoutShell({
             userInitials={userInitials}
             userName={userName}
             userEmail={userEmail}
+            userAvatarUrl={userAvatarUrl}
+            workspaces={workspaces}
           />
           {children}
         </main>

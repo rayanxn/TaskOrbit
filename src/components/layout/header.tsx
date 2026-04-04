@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { CircleUser, LogOut, Menu, Search, Settings } from "lucide-react";
 import { signOut } from "@/lib/actions/auth";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,12 +14,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useShell } from "@/components/layout/workspace-shell";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import type { WorkspaceRole } from "@/lib/types";
 
 interface HeaderProps {
   workspaceSlug: string;
   userInitials: string;
   userName: string | null;
   userEmail: string | null;
+  userAvatarUrl: string | null;
+  workspaces: {
+    role: WorkspaceRole;
+    workspace: { id: string; name: string; slug: string };
+  }[];
 }
 
 export function Header({
@@ -27,9 +33,20 @@ export function Header({
   userInitials,
   userName,
   userEmail,
+  userAvatarUrl,
+  workspaces,
 }: HeaderProps) {
   const shell = useShell();
   const accountLabel = userName ?? userEmail ?? "Account";
+  const currentWorkspace =
+    workspaces.find((entry) => entry.workspace.slug === workspaceSlug)?.workspace ?? null;
+  const orderedWorkspaces = [...workspaces].sort((a, b) => {
+    const aCurrent = a.workspace.slug === workspaceSlug ? 0 : 1;
+    const bCurrent = b.workspace.slug === workspaceSlug ? 0 : 1;
+
+    if (aCurrent !== bCurrent) return aCurrent - bCurrent;
+    return a.workspace.name.localeCompare(b.workspace.name);
+  });
 
   return (
     <header className="flex items-center justify-between gap-3 px-4 md:px-10 pt-6">
@@ -68,21 +85,66 @@ export function Header({
             className="rounded-full transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2"
           >
             <Avatar size="sm">
+              {userAvatarUrl && (
+                <AvatarImage src={userAvatarUrl} alt={accountLabel} />
+              )}
               <AvatarFallback>{userInitials}</AvatarFallback>
             </Avatar>
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuContent align="end" className="w-72">
           <DropdownMenuLabel className="normal-case tracking-normal">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-sm font-medium text-text">{accountLabel}</span>
-              {userEmail && (
-                <span className="text-xs font-normal text-text-muted">
-                  {userEmail}
+            <div className="flex items-center gap-3">
+              <Avatar>
+                {userAvatarUrl && (
+                  <AvatarImage src={userAvatarUrl} alt={accountLabel} />
+                )}
+                <AvatarFallback>{userInitials}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex flex-col gap-0.5">
+                <span className="truncate text-sm font-medium text-text">
+                  {accountLabel}
                 </span>
-              )}
+                {userEmail && (
+                  <span className="truncate text-xs font-normal text-text-muted">
+                    {userEmail}
+                  </span>
+                )}
+                {currentWorkspace && (
+                  <span className="truncate text-xs font-normal text-text-muted">
+                    {currentWorkspace.name}
+                  </span>
+                )}
+              </div>
             </div>
           </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+          <div className="max-h-64 overflow-y-auto">
+            {orderedWorkspaces.map(({ role, workspace }) => {
+              const isCurrent = workspace.slug === workspaceSlug;
+
+              return (
+                <DropdownMenuItem key={workspace.id} asChild>
+                  <Link href={`/${workspace.slug}/dashboard`}>
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="truncate text-sm text-text">
+                        {workspace.name}
+                      </span>
+                      <span className="truncate text-xs text-text-muted">
+                        {formatWorkspaceRole(role)}
+                      </span>
+                    </div>
+                    {isCurrent && (
+                      <span className="rounded-full bg-[#EDEAE4] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-text-muted">
+                        Current
+                      </span>
+                    )}
+                  </Link>
+                </DropdownMenuItem>
+              );
+            })}
+          </div>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
             <Link href={`/${workspaceSlug}/settings/profile`}>
@@ -110,4 +172,15 @@ export function Header({
       </DropdownMenu>
     </header>
   );
+}
+
+function formatWorkspaceRole(role: WorkspaceRole) {
+  switch (role) {
+    case "owner":
+      return "Owner";
+    case "admin":
+      return "Admin";
+    default:
+      return "Member";
+  }
 }
