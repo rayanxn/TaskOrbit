@@ -89,6 +89,28 @@ export function formatActivityAction(activity: ActivityWithActor): string {
       return `${actorName} ${activity.action} project ${name}`;
     }
 
+    case "team": {
+      const name = (meta.name as string) ?? "team";
+      const memberName = (meta.member_name as string) ?? "a member";
+
+      if (activity.action === "created") {
+        return `${actorName} created team ${name}`;
+      }
+      if (activity.action === "updated") {
+        return `${actorName} renamed team to ${name}`;
+      }
+      if (activity.action === "deleted") {
+        return `${actorName} deleted team ${name}`;
+      }
+      if (activity.action === "added_member") {
+        return `${actorName} added ${memberName} to ${name}`;
+      }
+      if (activity.action === "removed_member") {
+        return `${actorName} removed ${memberName} from ${name}`;
+      }
+      return `${actorName} ${activity.action} ${name}`;
+    }
+
     default:
       return `${actorName} ${activity.action}`;
   }

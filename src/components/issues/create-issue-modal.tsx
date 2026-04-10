@@ -20,6 +20,10 @@ import { cn } from "@/lib/utils/cn";
 import { PRIORITY_CONFIG } from "@/lib/utils/priorities";
 import { STATUS_CONFIG, STATUS_ORDER } from "@/lib/utils/statuses";
 import type { IssuePriority, IssueStatus } from "@/lib/types";
+import {
+  dedupeMembersByDisplayLabel,
+  dedupeMembersByUserId,
+} from "@/lib/utils/members";
 
 interface CreateIssueModalProps {
   open: boolean;
@@ -140,6 +144,10 @@ export function CreateIssueModal({
   const filteredLabels = labels.filter((l) => {
     return !selectedProjectId || !l.project_id || l.project_id === selectedProjectId;
   });
+  const uniqueMembers = dedupeMembersByDisplayLabel(
+    dedupeMembersByUserId(members),
+    defaultAssigneeId
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -188,7 +196,7 @@ export function CreateIssueModal({
                   defaultValue={defaultAssigneeId ?? ""}
                 >
                   <option value="">Unassigned</option>
-                  {members.map((m) => (
+                  {uniqueMembers.map((m) => (
                     <option key={m.user_id} value={m.user_id}>
                       {m.profile.full_name ?? m.profile.email}
                     </option>

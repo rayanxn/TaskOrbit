@@ -36,23 +36,29 @@ interface RecentActivityCardProps {
   activities: ActivityWithActor[];
   workspaceSlug: string;
   onIssueClick?: (id: string) => void;
+  title?: string;
+  showInboxLink?: boolean;
 }
 
 export function RecentActivityCard({
   activities,
   workspaceSlug,
   onIssueClick,
+  title = "Recent Activity",
+  showInboxLink = true,
 }: RecentActivityCardProps) {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-semibold text-text">Recent Activity</h2>
-        <Link
-          href={`/${workspaceSlug}/inbox`}
-          className="text-[13px] font-medium text-text-secondary hover:text-text transition-colors"
-        >
-          Inbox &rarr;
-        </Link>
+        <h2 className="text-base font-semibold text-text">{title}</h2>
+        {showInboxLink && (
+          <Link
+            href={`/${workspaceSlug}/inbox`}
+            className="text-[13px] font-medium text-text-secondary hover:text-text transition-colors"
+          >
+            Inbox &rarr;
+          </Link>
+        )}
       </div>
 
       {activities.length === 0 ? (

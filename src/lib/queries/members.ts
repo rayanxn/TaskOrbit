@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { dedupeMembersByUserId, sortMembersByDisplayName } from "@/lib/utils/members";
 
 export type WorkspaceMember = {
   id: string;
@@ -33,12 +34,16 @@ export async function getWorkspaceMembers(
     profileMap.set(p.id, p);
   }
 
-  return members
+  return sortMembersByDisplayName(
+    dedupeMembersByUserId(
+      members
     .filter((m) => profileMap.has(m.user_id))
     .map((m) => ({
       ...m,
       profile: profileMap.get(m.user_id)!,
-    }));
+    }))
+    )
+  );
 }
 
 export async function getWorkspaceTeams(workspaceId: string) {

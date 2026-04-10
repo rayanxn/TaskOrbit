@@ -22,6 +22,10 @@ import type { ChecklistItem } from "./issue-checklist";
 import type { IssueWithDetails } from "@/lib/queries/issues";
 import type { IssuePriority, IssueStatus } from "@/lib/types";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import {
+  dedupeMembersByDisplayLabel,
+  dedupeMembersByUserId,
+} from "@/lib/utils/members";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -61,8 +65,11 @@ export function IssueDetailPanel({
   const [saving, setSaving] = useState(false);
 
   // Track current issue id to avoid stale saves
-  const issueRef = useRef(issue);
-  issueRef.current = issue;
+  const issueRef = useRef<IssueWithDetails | null>(issue);
+
+  useEffect(() => {
+    issueRef.current = issue;
+  }, [issue]);
 
   // ── Sync state from issue prop ─────────────────────────────
   useEffect(() => {
@@ -117,6 +124,15 @@ export function IssueDetailPanel({
     [router]
   );
 
+  // ── Copy permalink ─────────────────────────────────────────
+  const copyPermalink = useCallback(() => {
+    if (!issue) return;
+    const url = `${window.location.origin}${pathname}?issue=${issue.issue_key}`;
+    navigator.clipboard.writeText(url).then(() => {
+      toast.success("Link copied");
+    });
+  }, [issue, pathname]);
+
   // ── Keyboard shortcuts ─────────────────────────────────────
   useEffect(() => {
     if (!open) return;
@@ -162,18 +178,14 @@ export function IssueDetailPanel({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, save]);
-
-  // ── Copy permalink ─────────────────────────────────────────
-  const copyPermalink = useCallback(() => {
-    if (!issue) return;
-    const url = `${window.location.origin}${pathname}?issue=${issue.issue_key}`;
-    navigator.clipboard.writeText(url).then(() => {
-      toast.success("Link copied");
-    });
-  }, [issue, pathname]);
+  }, [open, save, copyPermalink]);
 
   if (!issue) return null;
+
+  const uniqueMembers = dedupeMembersByDisplayLabel(
+    dedupeMembersByUserId(members),
+    assigneeId
+  );
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -363,7 +375,7 @@ export function IssueDetailPanel({
                   className="flex h-8 w-full rounded-lg border border-border bg-surface px-2.5 text-xs text-text focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-border-strong transition-colors"
                 >
                   <option value="">Unassigned</option>
-                  {members.map((m) => (
+                  {uniqueMembers.map((m) => (
                     <option key={m.user_id} value={m.user_id}>
                       {m.profile.full_name ?? m.profile.email}
                     </option>

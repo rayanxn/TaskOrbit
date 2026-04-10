@@ -1,11 +1,9 @@
 import { notFound } from "next/navigation";
-import { Users } from "lucide-react";
 import { getWorkspaceBySlug } from "@/lib/queries/workspaces";
 import { getTeamsWithMembers } from "@/lib/queries/teams";
-import { TeamsList } from "@/components/teams/teams-list";
-import { EmptyState } from "@/components/ui/empty-state";
+import { getWorkspaceMembers } from "@/lib/queries/members";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
-import { InviteMemberButton } from "@/components/teams/invite-member-button";
+import { TeamsPageClient } from "@/components/teams/teams-page-client";
 
 export default async function TeamsPage({
   params,
@@ -16,26 +14,21 @@ export default async function TeamsPage({
   const result = await getWorkspaceBySlug(workspaceSlug);
   if (!result?.workspace) notFound();
 
-  const teams = await getTeamsWithMembers(result.workspace.id);
+  const [teams, workspaceMembers] = await Promise.all([
+    getTeamsWithMembers(result.workspace.id),
+    getWorkspaceMembers(result.workspace.id),
+  ]);
 
   return (
     <div className="flex flex-col py-6 px-8 gap-5">
       <Breadcrumb workspaceName={result.workspace.name} pageName="Teams" />
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-text">
-          Teams
-        </h1>
-        <InviteMemberButton workspaceId={result.workspace.id} />
-      </div>
-      {teams.length > 0 ? (
-        <TeamsList teams={teams} />
-      ) : (
-        <EmptyState
-          icon={Users}
-          title="No teams yet"
-          description="Create teams to organize your workspace members."
-        />
-      )}
+      <TeamsPageClient
+        teams={teams}
+        workspaceId={result.workspace.id}
+        workspaceSlug={workspaceSlug}
+        workspaceMembers={workspaceMembers}
+        canManageTeams={result.role !== "member"}
+      />
     </div>
   );
 }
