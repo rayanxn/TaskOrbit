@@ -32,6 +32,7 @@ async function createChildFromParentDetail(page: Page, title: string, storyPoint
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText(parentKey)).toBeVisible();
   await expect(dialog.getByLabel("Project")).toBeDisabled();
+  await expect(dialog.getByLabel("Sprint")).toBeDisabled();
   if (selectedSprintId) {
     await expect(dialog.getByLabel("Sprint")).toHaveValue(selectedSprintId);
   }
@@ -122,6 +123,7 @@ test.describe.serial("sub-issues hierarchy", () => {
     await dialog.getByRole("button", { name: new RegExp(parentKey) }).click();
     await expect(dialog.getByText(parentKey)).toBeVisible();
     await expect(dialog.getByLabel("Project")).toBeDisabled();
+    await expect(dialog.getByLabel("Sprint")).toBeDisabled();
     if (selectedSprintId) {
       await expect(dialog.getByLabel("Sprint")).toHaveValue(selectedSprintId);
     }

@@ -68,6 +68,7 @@ export function CreateIssueModal({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ title?: string; projectId?: string }>({});
   const [showLabelPicker, setShowLabelPicker] = useState(false);
+  const sprintLocked = Boolean(selectedParent);
 
   function resetFormState() {
     setPriority(3);
@@ -100,9 +101,12 @@ export function CreateIssueModal({
 
     setLoading(true);
     setError(null);
+    const resolvedSprintId = selectedParent
+      ? (selectedParent.sprint_id ?? "")
+      : selectedSprintId;
     formData.set("workspaceId", workspace.id);
     formData.set("projectId", selectedProjectId);
-    formData.set("sprintId", selectedSprintId);
+    formData.set("sprintId", resolvedSprintId);
     formData.set("priority", String(priority));
     formData.set("status", status);
     formData.set("labelIds", selectedLabels.join(","));
@@ -336,6 +340,7 @@ export function CreateIssueModal({
                   name="sprintId"
                   className="flex h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-border-strong transition-colors"
                   value={selectedSprintId}
+                  disabled={sprintLocked}
                   onChange={(e) => setSelectedSprintId(e.target.value)}
                 >
                   <option value="">No sprint</option>
@@ -345,6 +350,12 @@ export function CreateIssueModal({
                     </option>
                   ))}
                 </select>
+                {sprintLocked && (
+                  <p className="text-xs text-text-muted">
+                    Inherited from the selected parent issue. You can move the
+                    sub-issue after creation.
+                  </p>
+                )}
               </div>
             </div>
 

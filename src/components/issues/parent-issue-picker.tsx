@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { LoaderCircle, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils/cn";
@@ -33,39 +33,8 @@ export function ParentIssuePicker({
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handlePointerDown(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, []);
-
-  useEffect(() => {
-    if (!open || disabled || !projectId) {
-      return;
-    }
-
-    let cancelled = false;
-    setLoading(true);
-
-    const timer = window.setTimeout(() => {
-      searchParentIssuesClient(projectId, query, { excludeIssueId }).then((items) => {
-        if (cancelled) return;
-        setResults(items);
-        setLoading(false);
-      });
-    }, 150);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [open, query, projectId, excludeIssueId, disabled]);
+  const searchTimeoutRef = useRef<number | null>(null);
+  const requestIdRef = useRef(0);
 
   const searchDisabled = disabled || !projectId;
   const searchPlaceholder = disabled
@@ -73,6 +42,65 @@ export function ParentIssuePicker({
     : projectId
       ? placeholder
       : "Select a project first";
+
+  const cancelPendingSearch = useCallback(() => {
+    requestIdRef.current += 1;
+    if (searchTimeoutRef.current !== null) {
+      window.clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+  }, []);
+
+  const resetSearchState = useCallback(() => {
+    cancelPendingSearch();
+    setLoading(false);
+    setResults([]);
+  }, [cancelPendingSearch]);
+
+  const queueSearch = useCallback((nextQuery: string) => {
+    if (searchDisabled || !projectId) {
+      return;
+    }
+
+    cancelPendingSearch();
+    setLoading(true);
+
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    searchTimeoutRef.current = window.setTimeout(() => {
+      searchTimeoutRef.current = null;
+
+      searchParentIssuesClient(projectId, nextQuery, { excludeIssueId })
+        .then((items) => {
+          if (requestId !== requestIdRef.current) return;
+          setResults(items);
+          setLoading(false);
+        })
+        .catch(() => {
+          if (requestId !== requestIdRef.current) return;
+          setResults([]);
+          setLoading(false);
+        });
+    }, 150);
+  }, [cancelPendingSearch, excludeIssueId, projectId, searchDisabled]);
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        resetSearchState();
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [resetSearchState]);
+
+  useEffect(() => {
+    return () => {
+      cancelPendingSearch();
+    };
+  }, [cancelPendingSearch]);
 
   return (
     <div ref={rootRef} className="space-y-2">
@@ -91,6 +119,7 @@ export function ParentIssuePicker({
             onClick={() => {
               onChange(null);
               setQuery("");
+              resetSearchState();
             }}
             className="shrink-0 rounded-md p-1 text-text-muted transition-colors hover:bg-surface hover:text-text"
             aria-label="Clear parent issue"
@@ -105,12 +134,15 @@ export function ParentIssuePicker({
         <Input
           value={query}
           onChange={(event) => {
-            setQuery(event.target.value);
+            const nextQuery = event.target.value;
+            setQuery(nextQuery);
             setOpen(true);
+            queueSearch(nextQuery);
           }}
           onFocus={() => {
             if (!searchDisabled) {
               setOpen(true);
+              queueSearch(query);
             }
           }}
           placeholder={searchPlaceholder}
@@ -133,6 +165,7 @@ export function ParentIssuePicker({
                   onClick={() => {
                     onChange(result);
                     setQuery("");
+                    resetSearchState();
                     setOpen(false);
                   }}
                   className={cn(

@@ -198,8 +198,9 @@ export async function createIssue(
   }
 
   const resolvedParent = parentResult.data;
-  const resolvedSprintId =
-    sprintId || resolvedParent?.sprint_id || null;
+  const resolvedSprintId = resolvedParent
+    ? resolvedParent.sprint_id ?? null
+    : sprintId;
 
   const { data, error } = await supabase.rpc("create_issue", {
     p_workspace_id: workspaceId,

@@ -122,14 +122,15 @@ export function BoardView({
     }
 
     return issues.map((issue) => {
-      const parent =
-        issue.parent_id && issueMap.has(issue.parent_id)
+      const parent = issue.parent_id
+        ? issueMap.has(issue.parent_id)
           ? {
               id: issue.parent_id,
               issue_key: issueMap.get(issue.parent_id)!.issue_key,
               title: issueMap.get(issue.parent_id)!.title,
             }
-          : issue.parent;
+          : issue.parent
+        : null;
       const stats = childStats.get(issue.id);
 
       return {
