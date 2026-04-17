@@ -69,7 +69,7 @@ export function formatActivityAction(activity: ActivityWithActor): string {
     }
 
     case "sprint": {
-      const name = (meta.name as string) ?? "Sprint";
+      const name = ((meta.name ?? meta.sprint_name) as string) ?? "Sprint";
       if (activity.action === "started") {
         return `${actorName} started ${name}`;
       }
@@ -97,6 +97,39 @@ export function formatActivityAction(activity: ActivityWithActor): string {
         return `${actorName} updated project ${name}`;
       }
       return `${actorName} ${activity.action} project ${name}`;
+    }
+
+    case "team": {
+      const name = (meta.name as string) ?? "team";
+      const memberName = (meta.member_name as string) ?? "a member";
+      const projectName = (meta.project_name as string) ?? "a project";
+
+      if (activity.action === "created") {
+        return `${actorName} created team ${name}`;
+      }
+      if (activity.action === "deleted") {
+        return `${actorName} deleted team ${name}`;
+      }
+      if (activity.action === "updated") {
+        const changes = meta.changes as Record<string, unknown> | undefined;
+        if (typeof changes?.name === "string") {
+          return `${actorName} renamed team to ${changes.name}`;
+        }
+        return `${actorName} updated team ${name}`;
+      }
+      if (activity.action === "member_added") {
+        return `${actorName} added ${memberName} to team ${name}`;
+      }
+      if (activity.action === "member_removed") {
+        return `${actorName} removed ${memberName} from team ${name}`;
+      }
+      if (activity.action === "project_linked") {
+        return `${actorName} linked ${projectName} to team ${name}`;
+      }
+      if (activity.action === "project_unlinked") {
+        return `${actorName} unlinked ${projectName} from team ${name}`;
+      }
+      return `${actorName} ${activity.action} team ${name}`;
     }
 
     case "invite": {

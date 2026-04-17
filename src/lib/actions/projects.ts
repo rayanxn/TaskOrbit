@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResponse, Tables } from "@/lib/types";
 import { createActivity } from "@/lib/actions/activities";
+import { recordProjectOwnershipActivities, type TeamRef } from "@/lib/actions/teams";
 
 export async function updateProject(
   projectId: string,
@@ -15,6 +16,16 @@ export async function updateProject(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+
+  const { data: currentProject, error: projectError } = await supabase
+    .from("projects")
+    .select("id, workspace_id, name, team_id")
+    .eq("id", projectId)
+    .maybeSingle();
+
+  if (projectError || !currentProject) {
+    return { error: projectError?.message ?? "Project not found" };
+  }
 
   const updates: Record<string, unknown> = {};
 
@@ -32,6 +43,19 @@ export async function updateProject(
   if (teamId !== null) updates.team_id = teamId || null;
   if (isPrivate !== null) updates.is_private = isPrivate === "true";
 
+  if (teamId) {
+    const { data: nextTeam } = await supabase
+      .from("teams")
+      .select("id")
+      .eq("id", teamId)
+      .eq("workspace_id", currentProject.workspace_id)
+      .maybeSingle();
+
+    if (!nextTeam) {
+      return { error: "Selected team is not available in this workspace" };
+    }
+  }
+
   const { data, error } = await supabase
     .from("projects")
     .update(updates)
@@ -44,6 +68,33 @@ export async function updateProject(
   }
 
   try {
+    const teamChanged =
+      teamId !== null && (teamId || null) !== currentProject.team_id;
+    let previousTeam: TeamRef = null;
+    let nextTeam: TeamRef = null;
+
+    if (teamChanged) {
+      const teamIds = [currentProject.team_id, data.team_id].filter(
+        (value): value is string => Boolean(value),
+      );
+
+      if (teamIds.length > 0) {
+        const { data: teams } = await supabase
+          .from("teams")
+          .select("id, name")
+          .in("id", teamIds);
+
+        previousTeam =
+          currentProject.team_id != null
+            ? teams?.find((team) => team.id === currentProject.team_id) ?? null
+            : null;
+        nextTeam =
+          data.team_id != null
+            ? teams?.find((team) => team.id === data.team_id) ?? null
+            : null;
+      }
+    }
+
     await createActivity({
       supabase,
       workspaceId: data.workspace_id,
@@ -53,6 +104,16 @@ export async function updateProject(
       entityId: projectId,
       metadata: { name: data.name, project_id: projectId, changes: updates },
     });
+
+    if (teamChanged) {
+      await recordProjectOwnershipActivities({
+        supabase,
+        actorId: user.id,
+        project: data,
+        previousTeam,
+        nextTeam,
+      });
+    }
   } catch {
     // Activity logging should not block the primary operation
   }

@@ -22,12 +22,14 @@ type Member = {
 interface ProjectGeneralFormProps {
   project: Tables<"projects">;
   members: Member[];
+  teams: { id: string; name: string }[];
   workspaceSlug: string;
 }
 
 export function ProjectGeneralForm({
   project,
   members,
+  teams,
   workspaceSlug,
 }: ProjectGeneralFormProps) {
   const router = useRouter();
@@ -131,6 +133,25 @@ export function ProjectGeneralForm({
             {members.map((m) => (
               <option key={m.user_id} value={m.user_id}>
                 {m.profile.full_name ?? m.profile.email}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="proj-team" className="text-[13px] font-medium text-text block">
+            Team
+          </label>
+          <select
+            id="proj-team"
+            name="teamId"
+            defaultValue={project.team_id ?? ""}
+            className="h-11 w-full rounded-[10px] border border-border-input bg-surface px-3.5 text-sm font-medium text-text transition-colors focus:outline-none focus:ring-2 focus:ring-primary/10"
+          >
+            <option value="">No team</option>
+            {teams.map((team) => (
+              <option key={team.id} value={team.id}>
+                {team.name}
               </option>
             ))}
           </select>
