@@ -8,7 +8,6 @@ import {
   Mail,
   CircleUser,
   FolderKanban,
-  Filter,
   Users,
   BarChart3,
   Settings,
@@ -41,7 +40,6 @@ const navItems = [
   { label: "Inbox", icon: Mail, href: "/inbox", badge: true },
   { label: "My Issues", icon: CircleUser, href: "/my-issues" },
   { label: "Projects", icon: FolderKanban, href: "/projects" },
-  { label: "Views", icon: Filter, href: "/views" },
   { label: "Teams", icon: Users, href: "/teams" },
   { label: "Analytics", icon: BarChart3, href: "/analytics" },
 ];

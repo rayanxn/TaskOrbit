@@ -29,7 +29,7 @@ The `/playwright-cli` skill is pre-configured for authenticated browsing on loca
 - **Base URL**: `http://localhost:3000`
 - **Workspace slug**: `pw-workspace` — all authenticated pages live under `/pw-workspace/...`
 - **Dashboard**: `http://localhost:3000/pw-workspace/dashboard`
-- **Available pages**: dashboard, inbox, my-issues, projects, views, teams, analytics, settings
+- **Available pages**: dashboard, inbox, my-issues, projects, teams, analytics, settings
 
 ## Concurrent agents
 
