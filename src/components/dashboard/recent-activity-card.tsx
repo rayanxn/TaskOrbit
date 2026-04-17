@@ -1,5 +1,16 @@
 import Link from "next/link";
-import { Plus, ArrowRight, UserCheck, Pencil, Trash2, Zap } from "lucide-react";
+import {
+  Plus,
+  ArrowRight,
+  UserCheck,
+  UserPlus,
+  UserMinus,
+  FolderKanban,
+  Users,
+  Pencil,
+  Trash2,
+  Zap,
+} from "lucide-react";
 import type { ActivityWithActor } from "@/lib/utils/activities";
 import { formatActivityAction } from "@/lib/utils/activities";
 import { formatRelative } from "@/lib/utils/dates";
@@ -20,6 +31,15 @@ function getActorInitials(
 }
 
 function getActivityIcon(activity: ActivityWithActor) {
+  if (activity.entity_type === "team") {
+    if (activity.action === "created" || activity.action === "updated") return Users;
+    if (activity.action === "deleted") return Trash2;
+    if (activity.action === "member_added") return UserPlus;
+    if (activity.action === "member_removed") return UserMinus;
+    if (activity.action === "project_linked" || activity.action === "project_unlinked") {
+      return FolderKanban;
+    }
+  }
   if (activity.action === "created") return Plus;
   if (activity.action === "deleted") return Trash2;
   if (activity.action === "added_sub_issue") return Plus;

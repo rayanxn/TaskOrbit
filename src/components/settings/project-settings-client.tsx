@@ -22,6 +22,7 @@ interface ProjectSettingsClientProps {
   project: Tables<"projects">;
   labels: Tables<"labels">[];
   members: Member[];
+  teams: { id: string; name: string }[];
   workspaceSlug: string;
 }
 
@@ -32,6 +33,7 @@ export function ProjectSettingsClient({
   project,
   labels,
   members,
+  teams,
   workspaceSlug,
 }: ProjectSettingsClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>("General");
@@ -68,6 +70,7 @@ export function ProjectSettingsClient({
           <ProjectGeneralForm
             project={project}
             members={members}
+            teams={teams}
             workspaceSlug={workspaceSlug}
           />
         )}

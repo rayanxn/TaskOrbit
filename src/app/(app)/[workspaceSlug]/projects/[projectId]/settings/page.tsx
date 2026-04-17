@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getProjectById, getProjectLabels } from "@/lib/queries/projects";
-import { getWorkspaceMembers } from "@/lib/queries/members";
+import { getWorkspaceMembers, getWorkspaceTeams } from "@/lib/queries/members";
 import { getWorkspaceBySlug } from "@/lib/queries/workspaces";
 import { ProjectSettingsClient } from "@/components/settings/project-settings-client";
 
@@ -21,13 +21,17 @@ export default async function ProjectSettingsPage({
     notFound();
   }
 
-  const members = await getWorkspaceMembers(wsResult.workspace.id);
+  const [members, teams] = await Promise.all([
+    getWorkspaceMembers(wsResult.workspace.id),
+    getWorkspaceTeams(wsResult.workspace.id),
+  ]);
 
   return (
     <ProjectSettingsClient
       project={project}
       labels={labels}
       members={members}
+      teams={teams}
       workspaceSlug={workspaceSlug}
     />
   );
