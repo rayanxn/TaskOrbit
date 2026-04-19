@@ -6,41 +6,39 @@
 
 ## About
 
-Flow is a project management app for small product teams — projects, sprints, issues, and analytics in one place. The middle ground between Jira's paperwork and Linear's weight: fast enough to capture work without friction, structured enough to actually ship it.
-
-It's a complete working product — auth, real-time updates, row-level security, drag-and-drop boards, sprint planning, analytics, and an opinionated visual design.
+Flow is a project management app for small product teams. Projects, sprints, issues, and analytics, all in one app. I built it because I wanted something lighter than Jira without giving up on real structure.
 
 ## A tour
 
-### Dashboard — what's happening right now
+### Dashboard
 
-The first thing you see: active sprint, your top issues, and a live activity feed from the team.
+Active sprint at the top, your assigned issues, and an activity feed showing what the rest of the team has been up to. First thing you see after signing in.
 
 ![Dashboard](docs/images/dashboard.png)
 
-### Board — drag, drop, ship
+### Board
 
-A kanban board with filtering by status, priority, assignee, and label. Drag-and-drop powered by dnd-kit, with optimistic updates so the board never feels laggy.
+Kanban with filters for status, priority, assignee, and label. Drag-and-drop is built on dnd-kit with optimistic updates, so moving a card doesn't wait on the network.
 
 ![Board view](docs/images/board.png)
 
-### Analytics — how the team is actually shipping
+### Analytics
 
-Throughput, cycle time, cycle-time distribution, and per-assignee delivery. Server-computed aggregations, rendered with Recharts.
+Throughput, cycle time, cycle-time distribution, per-assignee delivery. Aggregations run on the server; charts are Recharts.
 
 ![Analytics](docs/images/analytics.png)
 
-### Inbox — zero noise
+### Inbox
 
-Notifications for everything happening on issues you care about. Filter by assigned vs. all; mark all as read in one click.
+Notifications for activity on issues you care about. Filter by assigned or all, mark everything read in one click.
 
 ![Inbox](docs/images/inbox.png)
 
 ## Built with
 
-- **Frontend** — Next.js 16 · React 19 · TypeScript · Tailwind v4 · GSAP + Lenis for motion
-- **Backend** — Supabase (Postgres · Auth · Row-Level Security) · Server Actions · Realtime channels
-- **Editor & UX** — TipTap rich text · Radix primitives · dnd-kit · cmdk command palette · Recharts
+- Frontend: Next.js 16, React 19, TypeScript, Tailwind v4, GSAP + Lenis for motion
+- Backend: Supabase (Postgres, Auth, Row-Level Security), Server Actions, Realtime channels
+- Editor & UX: TipTap, Radix, dnd-kit, cmdk, Recharts
 
 ## Run it locally
 
