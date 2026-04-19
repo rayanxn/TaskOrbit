@@ -48,6 +48,7 @@ next-env.d.ts
 
 # Screenshots & artifacts
 *.png
+!docs/images/*.png
 .playwright-cli/
 .claude/worktrees/
 CRITIQUE.md
