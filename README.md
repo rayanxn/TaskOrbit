@@ -1,6 +1,5 @@
 # Flow
 
-> A lightweight issue tracker for teams who'd rather build than manage tickets.
 
 **Live at [flowpm.vercel.app](https://flowpm.vercel.app)**
 
