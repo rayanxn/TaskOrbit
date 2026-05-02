@@ -6,7 +6,6 @@ import { ArrowRight } from "lucide-react";
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
-  { label: "Workflow", href: "#workflow" },
   { label: "Stack", href: "#stack" },
 ];
 
@@ -33,12 +32,12 @@ export function Navbar() {
           Flow
         </a>
 
-        <div className="hidden items-center gap-8 md:flex">
+        <div className="flex items-center gap-8">
           {NAV_LINKS.map((link) => (
             <a
               key={link.href}
               href={link.href}
-              className="text-sm text-text-secondary transition-colors duration-200 hover:text-text"
+              className="hidden text-sm text-text-secondary transition-colors duration-200 hover:text-text md:inline"
             >
               {link.label}
             </a>

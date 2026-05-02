@@ -18,7 +18,7 @@ const GROUPS = [
 
 export function Stack() {
   return (
-    <section id="stack" className="px-6 py-24 sm:px-12">
+    <section id="stack" className="px-6 py-16 sm:px-12 sm:py-24">
       <div className="mx-auto max-w-6xl">
         <p className="font-mono text-xs tracking-wider text-text-muted uppercase">Stack</p>
         <h2 className="mt-4 max-w-xl font-serif text-4xl italic text-text sm:text-5xl">
@@ -28,11 +28,11 @@ export function Stack() {
           Type-safe end to end. Real-time where it matters. Every piece chosen on purpose.
         </p>
 
-        <div className="mt-16 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="mt-12 grid grid-cols-1 gap-6 sm:mt-16 md:grid-cols-3">
           {GROUPS.map((group) => (
             <div
               key={group.title}
-              className="flex flex-col rounded-2xl border border-border bg-surface p-8"
+              className="flex flex-col rounded-2xl border border-border bg-surface p-6 sm:p-8"
             >
               <h3 className="text-xl font-semibold text-text">{group.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-text-secondary">{group.blurb}</p>

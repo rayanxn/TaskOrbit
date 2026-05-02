@@ -1,6 +1,5 @@
 const PRODUCT_LINKS = [
   { label: "Features", href: "#features" },
-  { label: "Workflow", href: "#workflow" },
   { label: "Stack", href: "#stack" },
 ];
 
@@ -11,9 +10,9 @@ const ACCOUNT_LINKS = [
 
 export function Footer() {
   return (
-    <footer className="relative z-10 -mt-8 rounded-t-[4rem] bg-[#1A1A1A] px-6 pt-20 pb-8 text-white/60 sm:px-12">
+    <footer className="relative z-10 -mt-8 rounded-t-[2.5rem] bg-[#1A1A1A] px-6 pt-14 pb-8 text-white/60 sm:rounded-t-[4rem] sm:px-12 sm:pt-20">
       <div className="mx-auto max-w-6xl">
-        <div className="grid grid-cols-1 gap-12 md:grid-cols-[2fr_1fr_1fr]">
+        <div className="grid grid-cols-1 gap-10 sm:gap-12 md:grid-cols-[2fr_1fr_1fr]">
           {/* Brand */}
           <div>
             <span className="font-serif text-xl text-white">Flow</span>
@@ -58,7 +57,7 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-16 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-6 sm:flex-row">
+        <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-6 sm:mt-16 sm:flex-row">
           <p className="text-xs">&copy; 2026 Flow. All rights reserved.</p>
           <div className="flex items-center gap-2 text-xs">
             <span className="relative flex h-2 w-2">

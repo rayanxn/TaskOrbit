@@ -4,7 +4,7 @@ export function CtaBanner() {
   return (
     <section className="px-6 pb-8 sm:px-12">
       <div className="mx-auto max-w-6xl">
-        <div className="flex flex-col items-center justify-between gap-8 rounded-3xl bg-primary px-8 py-12 sm:flex-row sm:px-12">
+        <div className="flex flex-col items-center justify-between gap-8 rounded-3xl bg-primary px-6 py-10 text-center sm:flex-row sm:px-12 sm:py-12 sm:text-left">
           <div>
             <h3 className="text-xl font-bold text-white sm:text-2xl">
               Ready to move work forward?

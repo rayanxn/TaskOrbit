@@ -22,7 +22,7 @@ const CARDS = [
 
 export function Features() {
   return (
-    <section id="features" className="px-6 py-24 sm:px-12">
+    <section id="features" className="px-6 py-16 sm:px-12 sm:py-24">
       <div className="mx-auto max-w-6xl">
         {/* Section heading */}
         <p className="font-mono text-xs tracking-wider text-text-muted uppercase">Features</p>
@@ -34,7 +34,7 @@ export function Features() {
         </p>
 
         {/* Cards */}
-        <div className="mt-16 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="mt-12 grid grid-cols-1 gap-6 sm:mt-16 md:grid-cols-3">
           {CARDS.map((card) => (
             <div
               key={card.title}
