@@ -48,15 +48,15 @@ function dateOnly(daysOffset: number): string {
 // ---------------------------------------------------------------------------
 
 const MEMBERS: Record<string, { email: string; full_name: string }> = {
-  elena:  { email: "elena@test.flow.dev",  full_name: "Elena Vasquez" },
-  marcus: { email: "marcus@test.flow.dev", full_name: "Marcus Chen" },
-  james:  { email: "james@test.flow.dev",  full_name: "James Park" },
-  alex:   { email: "alex@test.flow.dev",   full_name: "Alex Rivera" },
-  sarah:  { email: "sarah@test.flow.dev",  full_name: "Sarah Kim" },
-  tom:    { email: "tom@test.flow.dev",     full_name: "Tom Andersen" },
-  mia:    { email: "mia@test.flow.dev",     full_name: "Mia Torres" },
-  lina:   { email: "lina@test.flow.dev",    full_name: "Lina Moreau" },
-  david:  { email: "david@test.flow.dev",   full_name: "David Okonkwo" },
+  elena:  { email: "mohammed.alqahtani@test.flow.dev", full_name: "Mohammed Al-Qahtani" },
+  marcus: { email: "fatima.alotaibi@test.flow.dev",    full_name: "Fatima Al-Otaibi" },
+  james:  { email: "abdullah.alghamdi@test.flow.dev",  full_name: "Abdullah Al-Ghamdi" },
+  alex:   { email: "noura.alharbi@test.flow.dev",      full_name: "Noura Al-Harbi" },
+  sarah:  { email: "khalid.aldossari@test.flow.dev",   full_name: "Khalid Al-Dossari" },
+  tom:    { email: "sara.almutairi@test.flow.dev",     full_name: "Sara Al-Mutairi" },
+  mia:    { email: "yousef.alshehri@test.flow.dev",    full_name: "Yousef Al-Shehri" },
+  lina:   { email: "reem.alzahrani@test.flow.dev",     full_name: "Reem Al-Zahrani" },
+  david:  { email: "faisal.alsubaie@test.flow.dev",    full_name: "Faisal Al-Subaie" },
 };
 
 // ---------------------------------------------------------------------------
@@ -871,7 +871,7 @@ async function createComments(
         workspace_id: workspaceId,
         issue_id: issues[0].id,
         author_id: userIds.alex,
-        body: `Good idea. @[Elena Vasquez](${userIds.elena}) I'll add that in the next iteration — need to finalize the KPI card design first.`,
+        body: `Good idea. @[Mohammed Al-Qahtani](${userIds.elena}) I'll add that in the next iteration — need to finalize the KPI card design first.`,
         mentions: [userIds.elena],
         created_at: daysAgo(3),
       },
@@ -895,7 +895,7 @@ async function createComments(
         workspace_id: workspaceId,
         issue_id: issues[7].id,
         author_id: ownerId,
-        body: `@[Marcus Chen](${userIds.marcus}) Thanks for the context. I'm going to add a pre-emptive refresh check — if the token expires within 5 minutes, refresh it before the request goes out.`,
+        body: `@[Fatima Al-Otaibi](${userIds.marcus}) Thanks for the context. I'm going to add a pre-emptive refresh check — if the token expires within 5 minutes, refresh it before the request goes out.`,
         mentions: [userIds.marcus],
         created_at: daysAgo(1),
       },

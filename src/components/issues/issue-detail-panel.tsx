@@ -85,6 +85,7 @@ export function IssueDetailPanel({
     (issue?.priority as IssuePriority) ?? 3,
   );
   const [assigneeId, setAssigneeId] = useState(issue?.assignee_id ?? "");
+  const [startDate, setStartDate] = useState(issue?.start_date ?? "");
   const [dueDate, setDueDate] = useState(issue?.due_date ?? "");
   const [storyPoints, setStoryPoints] = useState(
     issue?.story_points != null ? String(issue.story_points) : "",
@@ -520,11 +521,26 @@ export function IssueDetailPanel({
                 </select>
               </SidebarField>
 
+              {/* Start Date */}
+              <SidebarField label="Start Date">
+                <Input
+                  type="date"
+                  value={startDate}
+                  max={dueDate || undefined}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    save({ start_date: e.target.value || null });
+                  }}
+                  className="h-8 text-xs"
+                />
+              </SidebarField>
+
               {/* Due Date */}
               <SidebarField label="Due Date">
                 <Input
                   type="date"
                   value={dueDate}
+                  min={startDate || undefined}
                   onChange={(e) => {
                     setDueDate(e.target.value);
                     save({ due_date: e.target.value || null });

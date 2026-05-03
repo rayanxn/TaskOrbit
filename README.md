@@ -4,7 +4,7 @@ A lightweight issue tracker for teams who'd rather build than manage tickets.
 
 **[Try it live →](https://flowpm.vercel.app)**
 
-[![Flow](public/flow-demo-poster.jpg)](https://flowpm.vercel.app)
+[![Flow demo](public/flow-demo-poster.jpg)](https://github.com/rayanxn/Flow/releases/download/v0.1.0/flow-demo.mp4)
 
 ## Stack
 

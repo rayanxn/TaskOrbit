@@ -421,6 +421,7 @@ export type Database = {
           assignee_id: string | null;
           parent_id: string | null;
           sprint_id: string | null;
+          start_date: string | null;
           due_date: string | null;
           story_points: number | null;
           sort_order: number;
@@ -443,6 +444,7 @@ export type Database = {
           assignee_id?: string | null;
           parent_id?: string | null;
           sprint_id?: string | null;
+          start_date?: string | null;
           due_date?: string | null;
           story_points?: number | null;
           sort_order?: number;
@@ -465,6 +467,7 @@ export type Database = {
           assignee_id?: string | null;
           parent_id?: string | null;
           sprint_id?: string | null;
+          start_date?: string | null;
           due_date?: string | null;
           story_points?: number | null;
           sort_order?: number;
