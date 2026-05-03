@@ -1,15 +1,19 @@
 #!/usr/bin/env npx tsx
 
 /**
- * Seed realistic test data into the pw-workspace for Playwright testing.
+ * Seed the "Senior Project Demo" workspace for evaluator presentations.
+ *
+ * Creates a real authenticated account, a dedicated workspace, and the same
+ * data shape as the Playwright test workspace — but with Saudi Arabic names
+ * throughout. Sign in as the owner to demo the app.
+ *
+ * Owner account:
+ *   email:    demo@flow.dev
+ *   password: demo2026!
  *
  * Usage:
- *   npx tsx scripts/seed-test-data.ts          # seed (skips if already seeded)
- *   npx tsx scripts/seed-test-data.ts --force   # clear + re-seed
- *
- * Prerequisites:
- *   - Supabase running (local or remote) with .env.local configured
- *   - Auth setup completed: npx playwright test tests/auth.setup.ts --project=setup
+ *   npx tsx scripts/seed-senior-demo.ts          # seed (skips if already seeded)
+ *   npx tsx scripts/seed-senior-demo.ts --force  # clear + re-seed
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -23,12 +27,14 @@ const admin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const WORKSPACE_SLUG = "pw-workspace";
+const WORKSPACE_NAME = "Senior Project Demo";
+const WORKSPACE_SLUG = "senior-project-demo";
 
-// Display name applied to the workspace owner (the auth user created by
-// tests/auth.setup.ts as "Playwright Bot"). The auth identity stays the same
-// — only the rendered profile name changes — so login still works.
-const OWNER_DISPLAY_NAME = "Tariq Al-Anazi";
+const OWNER = {
+  email: "demo@flow.dev",
+  password: "demo2026!",
+  full_name: "Rayan Aljadhai",
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -49,19 +55,22 @@ function dateOnly(daysOffset: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Team member definitions (matching the Paper designs)
+// Team members
+//
+// The keys here mirror the original test seed (elena, marcus, …) so the issue,
+// comment, and activity bodies below can reuse the same role assignments.
 // ---------------------------------------------------------------------------
 
 const MEMBERS: Record<string, { email: string; full_name: string }> = {
-  elena:  { email: "mohammed.alqahtani@test.flow.dev", full_name: "Mohammed Al-Qahtani" },
-  marcus: { email: "fatima.alotaibi@test.flow.dev",    full_name: "Fatima Al-Otaibi" },
-  james:  { email: "abdullah.alghamdi@test.flow.dev",  full_name: "Abdullah Al-Ghamdi" },
-  alex:   { email: "noura.alharbi@test.flow.dev",      full_name: "Noura Al-Harbi" },
-  sarah:  { email: "khalid.aldossari@test.flow.dev",   full_name: "Khalid Al-Dossari" },
-  tom:    { email: "sara.almutairi@test.flow.dev",     full_name: "Sara Al-Mutairi" },
-  mia:    { email: "yousef.alshehri@test.flow.dev",    full_name: "Yousef Al-Shehri" },
-  lina:   { email: "reem.alzahrani@test.flow.dev",     full_name: "Reem Al-Zahrani" },
-  david:  { email: "faisal.alsubaie@test.flow.dev",    full_name: "Faisal Al-Subaie" },
+  elena:  { email: "mohammed.alqahtani@demo.flow.dev", full_name: "Mohammed Al-Qahtani" },
+  marcus: { email: "fatima.alotaibi@demo.flow.dev",    full_name: "Fatima Al-Otaibi" },
+  james:  { email: "abdullah.alghamdi@demo.flow.dev",  full_name: "Abdullah Al-Ghamdi" },
+  alex:   { email: "noura.alharbi@demo.flow.dev",      full_name: "Noura Al-Harbi" },
+  sarah:  { email: "khalid.aldossari@demo.flow.dev",   full_name: "Khalid Al-Dossari" },
+  tom:    { email: "sara.almutairi@demo.flow.dev",     full_name: "Sara Al-Mutairi" },
+  mia:    { email: "yousef.alshehri@demo.flow.dev",    full_name: "Yousef Al-Shehri" },
+  lina:   { email: "reem.alzahrani@demo.flow.dev",     full_name: "Reem Al-Zahrani" },
+  david:  { email: "faisal.alsubaie@demo.flow.dev",    full_name: "Faisal Al-Subaie" },
 };
 
 // ---------------------------------------------------------------------------
@@ -69,73 +78,60 @@ const MEMBERS: Record<string, { email: string; full_name: string }> = {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  console.log("Seeding test data for pw-workspace...\n");
+  console.log("Seeding %s workspace...\n", WORKSPACE_NAME);
 
-  // 1 — Find workspace
-  const { data: workspace } = await admin
-    .from("workspaces")
-    .select("*")
-    .eq("slug", WORKSPACE_SLUG)
-    .single();
+  // 1 — Owner auth user
+  const ownerId = await ensureOwnerUser();
+  console.log("  owner: %s <%s>", OWNER.full_name, OWNER.email);
 
-  if (!workspace) {
-    console.error(
-      "Workspace 'pw-workspace' not found.\n" +
-        "Run auth setup first: npx playwright test tests/auth.setup.ts --project=setup"
-    );
-    process.exit(1);
-  }
-
-  // 2 — Already seeded?
-  const { count } = await admin
-    .from("projects")
-    .select("*", { count: "exact", head: true })
-    .eq("workspace_id", workspace.id);
-
-  if (count && count > 0) {
-    if (!process.argv.includes("--force")) {
-      console.log(
-        "Already seeded (%d projects). Pass --force to re-seed.",
-        count
-      );
-      return;
+  // 2 — Workspace (find or create)
+  let workspace = await findWorkspace();
+  if (workspace) {
+    const { count } = await admin
+      .from("projects")
+      .select("*", { count: "exact", head: true })
+      .eq("workspace_id", workspace.id);
+    if (count && count > 0) {
+      if (!process.argv.includes("--force")) {
+        console.log(
+          "Already seeded (%d projects). Pass --force to re-seed.",
+          count
+        );
+        return;
+      }
+      console.log("--force: clearing existing data...\n");
+      await clearWorkspaceData(workspace.id);
     }
-    console.log("--force: clearing existing data...\n");
-    await clearWorkspaceData(workspace.id);
+  } else {
+    const { data, error } = await admin
+      .from("workspaces")
+      .insert({ name: WORKSPACE_NAME, slug: WORKSPACE_SLUG })
+      .select()
+      .single();
+    if (error) throw error;
+    workspace = data!;
+    console.log("  workspace: %s (%s)", workspace.name, workspace.slug);
   }
 
-  // 3 — Find owner and rename to a Saudi display name so the seeded
-  //      workspace doesn't expose the "Playwright Bot" test identity.
-  const { data: ownerRow } = await admin
-    .from("workspace_members")
-    .select("user_id")
-    .eq("workspace_id", workspace.id)
-    .eq("role", "owner")
-    .single();
-  const ownerId = ownerRow!.user_id;
+  // 3 — Owner membership
+  await admin.from("workspace_members").upsert(
+    { workspace_id: workspace.id, user_id: ownerId, role: "owner" },
+    { onConflict: "workspace_id,user_id" }
+  );
 
-  await admin.auth.admin.updateUserById(ownerId, {
-    user_metadata: { full_name: OWNER_DISPLAY_NAME },
-  });
-  await admin
-    .from("profiles")
-    .update({ full_name: OWNER_DISPLAY_NAME })
-    .eq("id", ownerId);
+  // 4 — Member users
+  const userIds = await ensureMembers();
+  console.log("  members: %d (+ owner)", Object.keys(userIds).length);
 
-  // 4 — Create / find team member users
-  const userIds = await ensureUsers();
-  console.log("  users: %d", Object.keys(userIds).length);
-
-  // 5 — Workspace memberships
+  // 5 — Memberships for the rest
   await admin.from("workspace_members").upsert(
     Object.values(userIds).map((uid) => ({
-      workspace_id: workspace.id,
+      workspace_id: workspace!.id,
       user_id: uid,
       role: "member",
     })),
     { onConflict: "workspace_id,user_id", ignoreDuplicates: true }
   );
-  console.log("  workspace members");
 
   // 6 — Teams
   const teams = await createTeams(workspace.id, userIds, ownerId);
@@ -145,7 +141,7 @@ async function main() {
   const projects = await createProjects(workspace.id, userIds, teams);
   console.log("  projects: %d", Object.keys(projects).length);
 
-  // 8 — Labels (6 defaults per project)
+  // 8 — Labels
   const labels = await createLabels(projects);
   console.log("  labels");
 
@@ -172,7 +168,21 @@ async function main() {
   await createComments(workspace.id, userIds, ownerId, issues);
   console.log("  comments");
 
-  console.log("\nDone — workspace seeded with test data.\n");
+  console.log("\nDone — sign in at /login with %s / %s", OWNER.email, OWNER.password);
+  console.log("Workspace URL: /%s/dashboard\n", WORKSPACE_SLUG);
+}
+
+// ---------------------------------------------------------------------------
+// Workspace lookup
+// ---------------------------------------------------------------------------
+
+async function findWorkspace() {
+  const { data } = await admin
+    .from("workspaces")
+    .select("*")
+    .eq("slug", WORKSPACE_SLUG)
+    .maybeSingle();
+  return data;
 }
 
 // ---------------------------------------------------------------------------
@@ -180,7 +190,6 @@ async function main() {
 // ---------------------------------------------------------------------------
 
 async function clearWorkspaceData(workspaceId: string) {
-  // Cascade handles join tables (issue_labels, team_members, etc.)
   await admin.from("notifications").delete().eq("workspace_id", workspaceId);
   await admin.from("comments").delete().eq("workspace_id", workspaceId);
   await admin.from("activities").delete().eq("workspace_id", workspaceId);
@@ -198,7 +207,33 @@ async function clearWorkspaceData(workspaceId: string) {
 // Users
 // ---------------------------------------------------------------------------
 
-async function ensureUsers(): Promise<Record<string, string>> {
+async function ensureOwnerUser(): Promise<string> {
+  const { data } = await admin.auth.admin.listUsers();
+  const found = data?.users.find((u) => u.email === OWNER.email);
+  let id: string;
+  if (found) {
+    await admin.auth.admin.updateUserById(found.id, {
+      password: OWNER.password,
+      user_metadata: { full_name: OWNER.full_name },
+    });
+    id = found.id;
+  } else {
+    const { data: created, error } = await admin.auth.admin.createUser({
+      email: OWNER.email,
+      password: OWNER.password,
+      email_confirm: true,
+      user_metadata: { full_name: OWNER.full_name },
+    });
+    if (error) throw error;
+    id = created.user.id;
+  }
+  // The on-signup trigger fills profiles from raw_user_meta_data, but a later
+  // updateUserById doesn't re-fire it — keep the profile name in sync explicitly.
+  await admin.from("profiles").update({ full_name: OWNER.full_name }).eq("id", id);
+  return id;
+}
+
+async function ensureMembers(): Promise<Record<string, string>> {
   const { data } = await admin.auth.admin.listUsers();
   const existing = data?.users ?? [];
   const ids: Record<string, string> = {};
@@ -210,7 +245,7 @@ async function ensureUsers(): Promise<Record<string, string>> {
     } else {
       const { data: created, error } = await admin.auth.admin.createUser({
         email: m.email,
-        password: "seedTest!2026",
+        password: "seedDemo!2026",
         email_confirm: true,
         user_metadata: { full_name: m.full_name },
       });
@@ -317,7 +352,7 @@ async function createProjects(
 }
 
 // ---------------------------------------------------------------------------
-// Labels (same defaults the app creates via createProject action)
+// Labels
 // ---------------------------------------------------------------------------
 
 async function createLabels(projects: Record<string, any>) {
@@ -336,7 +371,6 @@ async function createLabels(projects: Record<string, any>) {
 
   const { data: labels } = await admin.from("labels").insert(rows).select();
 
-  // Index by project_id → label name
   const map: Record<string, Record<string, any>> = {};
   for (const l of labels!) {
     (map[l.project_id] ??= {})[l.name] = l;
@@ -383,7 +417,7 @@ async function createIssues(
   const ds = projects.designSystem;
   const mob = projects.mobileApp;
 
-  let n = workspace.issue_counter; // continue from current counter
+  let n = workspace.issue_counter;
   const issue = (overrides: any) => {
     n++;
     return {
@@ -391,7 +425,7 @@ async function createIssues(
       issue_number: n,
       issue_key: `${workspace.issue_prefix}-${n}`,
       sort_order: n * 1000,
-      created_at: daysAgo(14), // "created at sprint planning"
+      created_at: daysAgo(14),
       ...overrides,
     };
   };
@@ -648,13 +682,11 @@ async function createIssues(
     .select();
   if (error) throw error;
 
-  // Update workspace counter
   await admin
     .from("workspaces")
     .update({ issue_counter: n })
     .eq("id", workspace.id);
 
-  // Attach labels to some issues
   const fl = labels[fe.id];
   const al = labels[api.id];
   const dl = labels[ds.id];
@@ -813,7 +845,6 @@ async function createActivities(
     .select();
   if (error) throw error;
 
-  // Notifications for the owner (Playwright Bot)
   await admin.from("notifications").insert([
     {
       workspace_id: workspaceId,
@@ -868,8 +899,6 @@ async function createComments(
   ownerId: string,
   issues: any[]
 ) {
-  // Comments on "Dashboard redesign" (issues[0])
-  // and "Fix auth token refresh on expired sessions" (issues[7])
   const { data: comments, error } = await admin
     .from("comments")
     .insert([
@@ -925,7 +954,6 @@ async function createComments(
     .select();
   if (error) throw error;
 
-  // Create activity records for the comments
   const commentActivities = comments!.map((c: any) => ({
     workspace_id: workspaceId,
     actor_id: c.author_id,
@@ -946,7 +974,6 @@ async function createComments(
     .insert(commentActivities)
     .select();
 
-  // Notify the owner about comments on their assigned issues
   if (activities && activities.length > 0) {
     const ownerNotifications = activities
       .filter((a: any) => a.actor_id !== ownerId)
@@ -965,10 +992,6 @@ async function createComments(
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// Run
-// ---------------------------------------------------------------------------
 
 main().catch((err) => {
   console.error("Seed failed:", err);
