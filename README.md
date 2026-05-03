@@ -1,10 +1,10 @@
 # Flow
 
-A lightweight issue tracker for teams who'd rather build than manage tickets.
+A lightweight issue tracker that respects your flow.
 
 **[Try it live →](https://flowpm.vercel.app)**
 
-[![Flow demo](public/flow-demo-poster.jpg)](https://github.com/rayanxn/Flow/releases/download/v0.1.0/flow-demo.mp4)
+https://github.com/user-attachments/assets/319a1da9-ff33-458b-a6f8-c2dfae1b46e1
 
 ## Stack
 
