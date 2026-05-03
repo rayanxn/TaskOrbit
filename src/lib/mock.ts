@@ -7,8 +7,8 @@ export const MOCK_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 export const MOCK_USER = {
   id: MOCK_USER_ID,
-  email: "marcus@acme.com",
-  user_metadata: { full_name: "Marcus Chen" },
+  email: "mohammed@acme.com",
+  user_metadata: { full_name: "Mohammed Al-Qahtani" },
 } as const;
 
 export const MOCK_WORKSPACE: Tables<"workspaces"> = {
@@ -43,10 +43,10 @@ export const MOCK_PROJECTS: Pick<Tables<"projects">, "id" | "name" | "color" | "
 // Phase 2 mock data
 
 const MOCK_PROFILES = {
-  marcus: { id: MOCK_USER_ID, full_name: "Marcus Chen", email: "marcus@acme.com", avatar_url: null },
-  elena: { id: "00000000-0000-0000-0000-000000000002", full_name: "Elena Rodriguez", email: "elena@acme.com", avatar_url: null },
-  sarah: { id: "00000000-0000-0000-0000-000000000003", full_name: "Sarah Kim", email: "sarah@acme.com", avatar_url: null },
-  alex: { id: "00000000-0000-0000-0000-000000000004", full_name: "Alex Turner", email: "alex@acme.com", avatar_url: null },
+  marcus: { id: MOCK_USER_ID, full_name: "Mohammed Al-Qahtani", email: "mohammed@acme.com", avatar_url: null },
+  elena: { id: "00000000-0000-0000-0000-000000000002", full_name: "Khalid Al-Dossari", email: "khalid@acme.com", avatar_url: null },
+  sarah: { id: "00000000-0000-0000-0000-000000000003", full_name: "Sara Al-Mutairi", email: "sara@acme.com", avatar_url: null },
+  alex: { id: "00000000-0000-0000-0000-000000000004", full_name: "Reem Al-Zahrani", email: "reem@acme.com", avatar_url: null },
 };
 
 export const MOCK_MEMBERS: WorkspaceMember[] = [
@@ -202,6 +202,7 @@ function mockIssue(
     assignee_id: overrides.assignee_id ?? MOCK_USER_ID,
     parent_id: overrides.parent_id ?? null,
     sprint_id: overrides.sprint_id ?? null,
+    start_date: overrides.start_date ?? null,
     due_date: overrides.due_date ?? null,
     story_points: overrides.story_points ?? null,
     sort_order: overrides.sort_order ?? overrides.issue_number * 1000,

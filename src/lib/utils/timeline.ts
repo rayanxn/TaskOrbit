@@ -8,6 +8,8 @@ import {
   startOfDay,
   startOfWeek,
   startOfMonth,
+  isSameWeek,
+  isSameMonth,
   format,
 } from "date-fns";
 
@@ -19,33 +21,58 @@ export const SCALE_CONFIG: Record<TimelineScale, { colWidth: number; label: stri
   month: { colWidth: 160, label: "Month" },
 };
 
+// Average days per column unit, used to translate horizontal drag pixels into
+// integer day deltas. Month uses 30.44 (365.25/12) for stable rounding.
+const DAYS_PER_UNIT: Record<TimelineScale, number> = {
+  day: 1,
+  week: 7,
+  month: 30.44,
+};
+
+export function getPixelsPerDay(scale: TimelineScale): number {
+  return SCALE_CONFIG[scale].colWidth / DAYS_PER_UNIT[scale];
+}
+
+export function toDateString(date: Date): string {
+  return format(date, "yyyy-MM-dd");
+}
+
 export function daysBetween(a: Date | string, b: Date | string): number {
   const dateA = typeof a === "string" ? new Date(a) : a;
   const dateB = typeof b === "string" ? new Date(b) : b;
   return differenceInDays(dateB, dateA);
 }
 
-export function getDateRange(
-  issues: { created_at: string; due_date: string | null }[]
-): { start: Date; end: Date } {
-  const dates = issues.flatMap((i) => {
-    const result = [new Date(i.created_at)];
-    if (i.due_date) result.push(new Date(i.due_date));
-    return result;
-  });
+// Bar start = explicit start_date if set, else 1 day before due_date.
+// This avoids the old created_at fallback, which conflated "logged at" with
+// "planned to start" and produced misleadingly long bars on legacy issues.
+export function getEffectiveStart(issue: {
+  start_date: string | null;
+  due_date: string;
+}): Date {
+  if (issue.start_date) return startOfDay(new Date(issue.start_date));
+  return addDays(startOfDay(new Date(issue.due_date)), -1);
+}
 
-  if (dates.length === 0) {
+export function getDateRange(
+  issues: { start_date: string | null; due_date: string }[]
+): { start: Date; end: Date } {
+  if (issues.length === 0) {
     const now = new Date();
     return { start: now, end: addDays(now, 30) };
   }
 
+  const dates = issues.flatMap((i) => [
+    getEffectiveStart(i),
+    startOfDay(new Date(i.due_date)),
+  ]);
+
   const min = new Date(Math.min(...dates.map((d) => d.getTime())));
   const max = new Date(Math.max(...dates.map((d) => d.getTime())));
 
-  // Add padding
   return {
-    start: addDays(startOfDay(min), -3),
-    end: addDays(startOfDay(max), 5),
+    start: addDays(min, -3),
+    end: addDays(max, 5),
   };
 }
 
@@ -63,6 +90,18 @@ export function getColumnForDate(
     case "month":
       return differenceInMonths(d, startDate) + 1;
   }
+}
+
+// Sub-column-precise pixel offset for a date. Used to position bars and the
+// today marker so a 3-day bar at week scale shows as ~3 days wide, not a
+// full week column.
+export function getPixelOffset(
+  date: Date | string,
+  startDate: Date,
+  scale: TimelineScale,
+): number {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return differenceInDays(d, startDate) * getPixelsPerDay(scale);
 }
 
 export function getColumnCount(
@@ -118,11 +157,22 @@ export function generateDateHeaders(
 
   let col = 1;
   while (current <= endDate) {
+    let isToday = false;
+    switch (scale) {
+      case "day":
+        isToday = current.getTime() === today.getTime();
+        break;
+      case "week":
+        isToday = isSameWeek(current, today, { weekStartsOn: 1 });
+        break;
+      case "month":
+        isToday = isSameMonth(current, today);
+        break;
+    }
     headers.push({
       label: format(current, formatStr),
       column: col,
-      isToday:
-        scale === "day" && current.getTime() === today.getTime(),
+      isToday,
     });
     current = addFn(current, 1);
     col++;
