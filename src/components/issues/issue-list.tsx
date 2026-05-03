@@ -6,12 +6,15 @@ import { IssueRow } from "./issue-row";
 import { STATUS_CONFIG, STATUS_ORDER } from "@/lib/utils/statuses";
 import type { IssueStatus } from "@/lib/types";
 import type { IssueWithDetails } from "@/lib/queries/issues";
+import type { Peer } from "@/lib/hooks/use-presence-channel";
 
 interface IssueListProps {
   issues: IssueWithDetails[];
   showProject?: boolean;
   onIssueClick?: (id: string) => void;
   treeMode?: boolean;
+  watchersByIssue?: Map<string, Peer[]>;
+  flashingIds?: Set<string>;
 }
 
 type TreeRow = {
@@ -25,6 +28,8 @@ export function IssueList({
   showProject = true,
   onIssueClick,
   treeMode = false,
+  watchersByIssue,
+  flashingIds,
 }: IssueListProps) {
   const [expandedParents, setExpandedParents] = useState<Record<string, boolean>>({});
 
@@ -79,6 +84,8 @@ export function IssueList({
               hasChildren={hasChildren}
               expanded={expandedParents[issue.id] ?? false}
               onToggleExpand={toggleParent}
+              watchers={watchersByIssue?.get(issue.id) ?? []}
+              isRemoteFlashing={flashingIds?.has(issue.id) ?? false}
             />
           ))}
         </div>
@@ -114,6 +121,8 @@ export function IssueList({
           issues={grouped.get(status) ?? []}
           showProject={showProject}
           onIssueClick={onIssueClick}
+          watchersByIssue={watchersByIssue}
+          flashingIds={flashingIds}
         />
       ))}
     </div>
@@ -138,11 +147,15 @@ function StatusGroup({
   issues,
   showProject,
   onIssueClick,
+  watchersByIssue,
+  flashingIds,
 }: {
   status: IssueStatus;
   issues: IssueWithDetails[];
   showProject: boolean;
   onIssueClick?: (id: string) => void;
+  watchersByIssue?: Map<string, Peer[]>;
+  flashingIds?: Set<string>;
 }) {
   const [expanded, setExpanded] = useState(status !== "done");
   const config = STATUS_CONFIG[status];
@@ -180,6 +193,8 @@ function StatusGroup({
               status={issue.status}
               showProject={showProject}
               onClick={onIssueClick}
+              watchers={watchersByIssue?.get(issue.id) ?? []}
+              isRemoteFlashing={flashingIds?.has(issue.id) ?? false}
             />
           ))}
         </div>

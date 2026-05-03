@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useCallback, Suspense } from "react";
+import { useState, useCallback, useEffect, Suspense } from "react";
 import { BoardView } from "@/components/board/board-view";
 import { IssueDetailPanel } from "@/components/issues/issue-detail-panel";
 import { useIssueFromUrl } from "@/lib/hooks/use-issue-from-url";
 import { FilterBar } from "@/components/filters/filter-bar";
 import { useIssueFilters } from "@/lib/hooks/use-issue-filters";
+import { PresenceProvider, usePresence } from "@/providers/presence-provider";
+import { PresenceStack } from "@/components/presence/presence-stack";
 import type { IssueWithDetails } from "@/lib/queries/issues";
 import { getIssueClient } from "@/lib/queries/issues-client";
 
@@ -24,6 +26,7 @@ function BoardWithDetailInner({
   sprints = [],
   labels = [],
 }: BoardWithDetailProps) {
+  const { peers, setFocusedIssue } = usePresence();
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [selectedIssueFallback, setSelectedIssueFallback] = useState<IssueWithDetails | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -68,22 +71,30 @@ function BoardWithDetailInner({
 
   useIssueFromUrl(initialIssues, openIssue);
 
+  // Broadcast which issue (if any) the user is currently focused on.
+  useEffect(() => {
+    setFocusedIssue(detailOpen && selectedIssueId ? selectedIssueId : null);
+  }, [detailOpen, selectedIssueId, setFocusedIssue]);
+
   return (
     <>
-      <div className="px-6 pt-4">
-        <FilterBar
-          filters={filters}
-          searchQuery={searchQuery}
-          searchInputRef={searchInputRef}
-          onSearchChange={setSearchQuery}
-          onToggleFilter={toggleFilter}
-          onClearFilter={clearFilter}
-          onClearAll={clearAll}
-          hasActiveFilters={hasActiveFilters}
-          enabledFilters={["status", "priority", "assignee", "label"]}
-          members={members}
-          labels={labels}
-        />
+      <div className="flex items-center justify-between gap-4 px-6 pt-4">
+        <div className="min-w-0 flex-1">
+          <FilterBar
+            filters={filters}
+            searchQuery={searchQuery}
+            searchInputRef={searchInputRef}
+            onSearchChange={setSearchQuery}
+            onToggleFilter={toggleFilter}
+            onClearFilter={clearFilter}
+            onClearAll={clearAll}
+            hasActiveFilters={hasActiveFilters}
+            enabledFilters={["status", "priority", "assignee", "label"]}
+            members={members}
+            labels={labels}
+          />
+        </div>
+        <PresenceStack peers={peers} />
       </div>
       <BoardView
         initialIssues={initialIssues}
@@ -108,7 +119,13 @@ function BoardWithDetailInner({
 export function BoardWithDetail(props: BoardWithDetailProps) {
   return (
     <Suspense>
-      <BoardWithDetailInner {...props} />
+      <PresenceProvider
+        projectId={props.projectId}
+        view="board"
+        members={props.members ?? []}
+      >
+        <BoardWithDetailInner {...props} />
+      </PresenceProvider>
     </Suspense>
   );
 }

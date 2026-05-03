@@ -18,8 +18,10 @@ setup("authenticate", async ({ page }) => {
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   let testUserId: string | null = null;
 
-  // Ensure the test user exists (idempotent)
-  const { data: existing } = await admin.auth.admin.listUsers();
+  // Ensure the test user exists (idempotent).
+  // listUsers() defaults to perPage=50; explicitly request more so the test
+  // user is found in installations that have grown past the first page.
+  const { data: existing } = await admin.auth.admin.listUsers({ perPage: 1000 });
   const alreadyExists = existing?.users?.find(
     (u) => u.email === TEST_EMAIL
   );

@@ -11,6 +11,7 @@ import { BoardCard } from "./board-card";
 import { BoardQuickAdd } from "./board-quick-add";
 import type { IssueStatus } from "@/lib/types";
 import type { IssueWithDetails } from "@/lib/queries/issues";
+import type { Peer } from "@/lib/hooks/use-presence-channel";
 
 interface BoardColumnProps {
   status: IssueStatus;
@@ -24,6 +25,9 @@ interface BoardColumnProps {
   onQuickAddCreated: () => void;
   onIssueClick?: (id: string) => void;
   onParentClick?: (id: string) => void;
+  peersByIssue?: Map<string, Peer[]>;
+  draggingByIssue?: Map<string, Peer>;
+  flashingIds?: Set<string>;
 }
 
 export function BoardColumn({
@@ -38,6 +42,9 @@ export function BoardColumn({
   onQuickAddCreated,
   onIssueClick,
   onParentClick,
+  peersByIssue,
+  draggingByIssue,
+  flashingIds,
 }: BoardColumnProps) {
   const { setNodeRef } = useDroppable({ id: status });
   const config = STATUS_CONFIG[status];
@@ -105,6 +112,9 @@ export function BoardColumn({
               subIssueTotalCount={showHierarchy ? issue.sub_issues_count : 0}
               onClick={onIssueClick}
               onParentClick={onParentClick}
+              watchers={peersByIssue?.get(issue.id) ?? []}
+              draggingPeer={draggingByIssue?.get(issue.id) ?? null}
+              isRemoteFlashing={flashingIds?.has(issue.id) ?? false}
             />
           ))}
 

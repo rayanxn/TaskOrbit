@@ -7,7 +7,10 @@ import { getInitials } from "@/lib/utils/format";
 import { PRIORITY_CONFIG } from "@/lib/utils/priorities";
 import { formatDate } from "@/lib/utils/dates";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { WatcherDots } from "@/components/presence/watcher-dots";
+import { DraggingPill } from "@/components/presence/dragging-pill";
 import type { IssuePriority } from "@/lib/types";
+import type { Peer } from "@/lib/hooks/use-presence-channel";
 
 export interface BoardCardProps {
   id: string;
@@ -29,6 +32,9 @@ export interface BoardCardProps {
   isDragOverlay?: boolean;
   onClick?: (id: string) => void;
   onParentClick?: (id: string) => void;
+  watchers?: Peer[];
+  draggingPeer?: Peer | null;
+  isRemoteFlashing?: boolean;
 }
 
 export function BoardCard({
@@ -48,8 +54,12 @@ export function BoardCard({
   isDragOverlay = false,
   onClick,
   onParentClick,
+  watchers,
+  draggingPeer,
+  isRemoteFlashing = false,
 }: BoardCardProps) {
-  const sortable = useSortable({ id, disabled: isDragOverlay });
+  const isRemoteDragging = !!draggingPeer && !isDragOverlay;
+  const sortable = useSortable({ id, disabled: isDragOverlay || isRemoteDragging });
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     isDragOverlay
       ? { attributes: {}, listeners: {}, setNodeRef: undefined, transform: null, transition: undefined, isDragging: false }
@@ -73,17 +83,25 @@ export function BoardCard({
     <div
       ref={setNodeRef}
       style={style}
+      data-issue-id={id}
       {...attributes}
       {...listeners}
-      onClick={() => { if (!isDragging && onClick) onClick(id); }}
+      onClick={() => {
+        if (!isDragging && !isRemoteDragging && onClick) onClick(id);
+      }}
       aria-label={`Issue ${issueKey}: ${title}`}
       aria-roledescription="sortable"
       className={cn(
-        "rounded-lg border border-border bg-surface p-3 shadow-sm cursor-grab active:cursor-grabbing transition-shadow hover:shadow-md",
+        "relative rounded-lg border border-border bg-surface p-3 shadow-sm transition-shadow duration-700 hover:shadow-md",
+        isRemoteDragging
+          ? "cursor-not-allowed opacity-60"
+          : "cursor-grab active:cursor-grabbing",
         isDragging && "opacity-30",
         isDragOverlay && "shadow-lg ring-2 ring-primary/10 rotate-[2deg]",
+        isRemoteFlashing && "ring-2 ring-primary/40",
       )}
     >
+      {isRemoteDragging && draggingPeer && <DraggingPill peer={draggingPeer} />}
       {/* Header: issue key + priority dot */}
       <div className="flex items-center justify-between">
         <span className="text-xs font-mono text-text-muted">{issueKey}</span>
@@ -174,8 +192,8 @@ export function BoardCard({
         </div>
       )}
 
-      {/* Footer: due date + assignee */}
-      {(dueDate || assignee) && (
+      {/* Footer: due date + watchers + assignee */}
+      {(dueDate || assignee || (watchers && watchers.length > 0)) && (
         <div className="flex items-center justify-between mt-2.5">
           {dueDate ? (
             <span
@@ -193,14 +211,19 @@ export function BoardCard({
           ) : (
             <span />
           )}
-          {assignee && (
-            <Avatar size="sm" className="h-6 w-6 text-[10px]">
-              {assignee.avatar_url && (
-                <AvatarImage src={assignee.avatar_url} alt={assignee.full_name ?? ""} />
-              )}
-              <AvatarFallback>{getInitials(assignee.full_name)}</AvatarFallback>
-            </Avatar>
-          )}
+          <div className="flex items-center gap-1.5">
+            {watchers && watchers.length > 0 && (
+              <WatcherDots peers={watchers} />
+            )}
+            {assignee && (
+              <Avatar size="sm" className="h-6 w-6 text-[10px]">
+                {assignee.avatar_url && (
+                  <AvatarImage src={assignee.avatar_url} alt={assignee.full_name ?? ""} />
+                )}
+                <AvatarFallback>{getInitials(assignee.full_name)}</AvatarFallback>
+              </Avatar>
+            )}
+          </div>
         </div>
       )}
     </div>

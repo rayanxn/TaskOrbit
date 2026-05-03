@@ -15,6 +15,7 @@ import { PRIORITY_CONFIG } from "@/lib/utils/priorities";
 import { STATUS_CONFIG, STATUS_ORDER } from "@/lib/utils/statuses";
 import { formatDate } from "@/lib/utils/dates";
 import { updateIssue } from "@/lib/actions/issues";
+import { useOptionalPresence } from "@/providers/presence-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils/format";
 import { TiptapEditor } from "./tiptap-editor";
@@ -72,6 +73,7 @@ export function IssueDetailPanel({
   syncUrl = true,
 }: IssueDetailPanelProps) {
   const router = useRouter();
+  const presence = useOptionalPresence();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -154,6 +156,7 @@ export function IssueDetailPanel({
       const current = issueRef.current;
       if (!current) return { error: "Issue not found" };
       setSaving(true);
+      presence?.markSelfUpdated(current.id);
       const result = await updateIssue(current.id, updates);
       setSaving(false);
       if (result.error) {
@@ -163,7 +166,7 @@ export function IssueDetailPanel({
       }
       return result;
     },
-    [router]
+    [router, presence]
   );
 
   // ── Copy permalink ─────────────────────────────────────────

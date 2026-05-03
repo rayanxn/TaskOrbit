@@ -55,6 +55,7 @@ export default async function ListPage({
 
       {hasIssues && (
         <ListViewContent
+          projectId={projectData.id}
           issues={issues}
           members={members}
           sprints={sprints}
