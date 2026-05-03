@@ -66,6 +66,10 @@ export function CommentThread({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const authorById = useMemo(
+    () => new Map(members.map((member) => [member.user_id, member.profile])),
+    [members]
+  );
 
   // Get current user ID client-side
   useEffect(() => {
@@ -155,6 +159,7 @@ export function CommentThread({
   const { comments, setComments } = useRealtimeComments({
     issueId,
     initialComments: fetchedComments,
+    authorById,
   });
 
   // Build interleaved timeline
@@ -200,20 +205,39 @@ export function CommentThread({
       });
 
       const result = await createComment({ issueId, workspaceId, body });
-      if (result.error) {
-        toast.error(result.error);
+      const saved = result.data;
+      if (!saved) {
+        toast.error(result.error ?? "Unable to create comment");
         // Remove optimistic comment on error
         setComments((prev) => prev.filter((c) => c.id !== optimisticId));
-      } else {
-        // Replace optimistic with real comment (realtime may also deliver it)
-        setComments((prev) =>
-          prev.map((c) =>
-            c.id === optimisticId ? { ...optimistic, ...result.data, author: optimistic.author } : c
-          )
-        );
+        return;
       }
+
+      // Replace optimistic with real comment and collapse any realtime copy.
+      const savedComment: CommentWithAuthor = {
+        ...optimistic,
+        ...saved,
+        author:
+          optimistic.author ??
+          authorById.get(saved.author_id) ??
+          null,
+      };
+
+      setComments((prev) => {
+        let replacedOptimistic = false;
+        const next = prev
+          .filter((c) => c.id !== saved.id)
+          .map((c) => {
+            if (c.id !== optimisticId) return c;
+
+            replacedOptimistic = true;
+            return savedComment;
+          });
+
+        return replacedOptimistic ? next : [...next, savedComment];
+      });
     },
-    [issueId, workspaceId, currentUserId, members, setComments]
+    [issueId, workspaceId, currentUserId, members, authorById, setComments]
   );
 
   const handleUpdateComment = useCallback(
