@@ -41,10 +41,10 @@ test.describe("Projects Page", () => {
 
   test("project cards show lead names", async ({ page }) => {
     const main = page.locator("main");
-    await expect(main.getByText("Marcus")).toBeVisible();
-    await expect(main.getByText("Elena")).toBeVisible();
-    await expect(main.getByText("Sarah")).toBeVisible();
-    await expect(main.getByText("Alex")).toBeVisible();
+    await expect(main.getByText("Mohammed")).toBeVisible();
+    await expect(main.getByText("Khalid")).toBeVisible();
+    await expect(main.getByText("Sara")).toBeVisible();
+    await expect(main.getByText("Reem")).toBeVisible();
   });
 
   test("project cards link to board view", async ({ page }) => {
