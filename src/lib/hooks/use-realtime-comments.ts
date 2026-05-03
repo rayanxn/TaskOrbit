@@ -8,11 +8,13 @@ import type { Tables } from "@/lib/types";
 interface UseRealtimeCommentsOptions {
   issueId: string | null;
   initialComments: CommentWithAuthor[];
+  authorById?: ReadonlyMap<string, CommentWithAuthor["author"]>;
 }
 
 export function useRealtimeComments({
   issueId,
   initialComments,
+  authorById,
 }: UseRealtimeCommentsOptions) {
   const [comments, setComments] =
     useState<CommentWithAuthor[]>(initialComments);
@@ -22,6 +24,26 @@ export function useRealtimeComments({
     setComments(initialComments);
   }, [initialComments]);
 
+  // Backfill authors for realtime rows that arrived without joined profile data.
+  useEffect(() => {
+    if (!authorById) return;
+
+    setComments((prev) => {
+      let changed = false;
+      const next = prev.map((comment) => {
+        if (comment.author) return comment;
+
+        const author = authorById.get(comment.author_id);
+        if (!author) return comment;
+
+        changed = true;
+        return { ...comment, author };
+      });
+
+      return changed ? next : prev;
+    });
+  }, [authorById]);
+
   const handleInsert = useCallback(
     (payload: { new: Tables<"comments"> }) => {
       const row = payload.new;
@@ -29,12 +51,12 @@ export function useRealtimeComments({
         if (prev.some((c) => c.id === row.id)) return prev;
         const stub: CommentWithAuthor = {
           ...row,
-          author: null,
+          author: authorById?.get(row.author_id) ?? null,
         };
         return [...prev, stub];
       });
     },
-    []
+    [authorById]
   );
 
   const handleUpdate = useCallback(
