@@ -2,7 +2,11 @@ import { expect, test } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Tables } from "../src/lib/types";
-import { cloneGuestWorkspace } from "../src/lib/guest/workspace-clone";
+import {
+  cloneGuestWorkspace,
+  createFreshGuestWorkspace,
+  type CloneGuestWorkspaceResult,
+} from "../src/lib/guest/workspace-clone";
 import { cleanupExpiredGuestWorkspaces } from "../src/lib/guest/cleanup";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -15,6 +19,7 @@ type SourceFixture = {
   workspace: Tables<"workspaces">;
   ownerId: string;
   memberId: string;
+  memberEmail: string;
   teamId: string;
   projectId: string;
   sprintId: string;
@@ -49,7 +54,8 @@ async function createUser(email: string, fullName: string) {
 
 async function createSourceFixture(): Promise<SourceFixture> {
   const ownerId = await createUser(`guest-owner-${RUN_ID}@test.flow.dev`, "Guest Source Owner");
-  const memberId = await createUser(`guest-member-${RUN_ID}@test.flow.dev`, "Guest Source Member");
+  const memberEmail = `guest-member-${RUN_ID}@test.flow.dev`;
+  const memberId = await createUser(memberEmail, "Guest Source Member");
 
   const { data: workspace, error: workspaceError } = await admin
     .from("workspaces")
@@ -210,6 +216,7 @@ async function createSourceFixture(): Promise<SourceFixture> {
     workspace: { ...workspace, issue_counter: 2 },
     ownerId,
     memberId,
+    memberEmail,
     teamId: team.id,
     projectId: project.id,
     sprintId: sprint.id,
@@ -229,6 +236,15 @@ async function getWorkspaceShape(workspaceId: string) {
     ]);
 
   return { projects, teams, sprints, issues };
+}
+
+function getClonedPersonaUserIds(
+  clone: CloneGuestWorkspaceResult,
+  fixture: SourceFixture,
+) {
+  return [...clone.maps.users.entries()]
+    .filter(([sourceUserId]) => sourceUserId !== fixture.ownerId)
+    .map(([, clonedUserId]) => clonedUserId);
 }
 
 test.describe.serial("guest workspace cloning and cleanup", () => {
@@ -263,6 +279,10 @@ test.describe.serial("guest workspace cloning and cleanup", () => {
     });
     workspaceIds.push(clone.workspace.id);
     lifecycleIds.push(clone.lifecycle.id);
+    const clonedMemberId = clone.maps.users.get(source.memberId);
+    expect(clonedMemberId).toBeTruthy();
+    expect(clonedMemberId).not.toBe(source.memberId);
+    userIds.push(...getClonedPersonaUserIds(clone, source));
 
     expect(clone.workspace.slug).toMatch(/^guest-workspace-[a-f0-9]{8}$/);
     expect(clone.workspace.issue_prefix).toBe(source.workspace.issue_prefix);
@@ -277,7 +297,8 @@ test.describe.serial("guest workspace cloning and cleanup", () => {
       .select("*")
       .eq("workspace_id", clone.workspace.id);
     expect(memberships?.find((member) => member.user_id === guestId)?.role).toBe("owner");
-    expect(memberships?.some((member) => member.user_id === source.memberId)).toBe(true);
+    expect(memberships?.some((member) => member.user_id === clonedMemberId)).toBe(true);
+    expect(memberships?.some((member) => member.user_id === source.memberId)).toBe(false);
     expect(memberships?.some((member) => member.user_id === source.ownerId)).toBe(false);
 
     const { data: teams } = await admin
@@ -292,7 +313,7 @@ test.describe.serial("guest workspace cloning and cleanup", () => {
       .select("*")
       .eq("team_id", teams![0].id);
     expect(teamMembers?.map((member) => member.user_id).sort()).toEqual(
-      [guestId, source.memberId].sort(),
+      [guestId, clonedMemberId].sort(),
     );
 
     const { data: projects } = await admin
@@ -331,14 +352,14 @@ test.describe.serial("guest workspace cloning and cleanup", () => {
     expect(parentIssue.id).not.toBe(source.parentIssueId);
     expect(parentIssue.project_id).toBe(clonedProject.id);
     expect(parentIssue.assignee_id).toBe(guestId);
-    expect(parentIssue.created_by).toBe(source.memberId);
+    expect(parentIssue.created_by).toBe(clonedMemberId);
     expect(parentIssue.checklist).toEqual([
       { id: expect.any(String), text: "Confirm guest clone", completed: true },
       { id: expect.any(String), text: "Verify issue counter", completed: false },
     ]);
     expect(childIssue.parent_id).toBe(parentIssue.id);
     expect(childIssue.created_by).toBe(guestId);
-    expect(childIssue.assignee_id).toBe(source.memberId);
+    expect(childIssue.assignee_id).toBe(clonedMemberId);
 
     const { data: issueLabels } = await admin
       .from("issue_labels")
@@ -371,7 +392,78 @@ test.describe.serial("guest workspace cloning and cleanup", () => {
     expect(newIssue?.issue_key).toBe("GST-3");
     await guestClient.auth.signOut();
 
+    const sourceMemberClient = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { error: sourceMemberSignInError } = await sourceMemberClient.auth.signInWithPassword({
+      email: source.memberEmail,
+      password: TEST_PASSWORD,
+    });
+    expect(sourceMemberSignInError).toBeNull();
+
+    const { data: sourceMemberWorkspace, error: sourceMemberWorkspaceError } =
+      await sourceMemberClient
+        .from("workspaces")
+        .select("id")
+        .eq("id", clone.workspace.id)
+        .maybeSingle();
+    expect(sourceMemberWorkspaceError).toBeNull();
+    expect(sourceMemberWorkspace).toBeNull();
+    await sourceMemberClient.auth.signOut();
+
     expect(await getWorkspaceShape(source.workspace.id)).toEqual(sourceShapeBefore);
+  });
+
+  test("creates a fresh guest workspace without demo data", async () => {
+    const guestId = await createUser(`fresh-start-guest-${RUN_ID}@test.flow.dev`, "Fresh Start Guest");
+
+    const fresh = await createFreshGuestWorkspace({
+      admin,
+      guestUserId: guestId,
+      now: new Date("2030-01-01T00:00:00.000Z"),
+    });
+    workspaceIds.push(fresh.workspace.id);
+    lifecycleIds.push(fresh.lifecycle.id);
+
+    expect(fresh.workspace.name).toBe("Fresh Workspace");
+    expect(fresh.workspace.slug).toMatch(/^guest-workspace-[a-f0-9]{8}$/);
+    expect(fresh.workspace.issue_counter).toBe(0);
+    expect(fresh.lifecycle.guest_user_id).toBe(guestId);
+    expect(fresh.lifecycle.source_workspace_id).toBeNull();
+    expect(fresh.lifecycle.source_workspace_slug).toBe("fresh-start");
+    expect(new Date(fresh.lifecycle.expires_at).getTime()).toBe(
+      new Date("2030-01-02T00:00:00.000Z").getTime(),
+    );
+
+    const { data: memberships } = await admin
+      .from("workspace_members")
+      .select("*")
+      .eq("workspace_id", fresh.workspace.id);
+    expect(memberships).toHaveLength(1);
+    expect(memberships?.[0].user_id).toBe(guestId);
+    expect(memberships?.[0].role).toBe("owner");
+
+    expect(await getWorkspaceShape(fresh.workspace.id)).toEqual({
+      projects: 0,
+      teams: 0,
+      sprints: 0,
+      issues: 0,
+    });
+
+    const guestClient = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { error: signInError } = await guestClient.auth.signInWithPassword({
+      email: `fresh-start-guest-${RUN_ID}@test.flow.dev`,
+      password: TEST_PASSWORD,
+    });
+    expect(signInError).toBeNull();
+
+    const { data: visibleWorkspace, error: visibleWorkspaceError } =
+      await guestClient
+        .from("workspaces")
+        .select("id")
+        .eq("id", fresh.workspace.id)
+        .single();
+    expect(visibleWorkspaceError).toBeNull();
+    expect(visibleWorkspace?.id).toBe(fresh.workspace.id);
+    await guestClient.auth.signOut();
   });
 
   test("removes expired guest workspaces and preserves active ones idempotently", async () => {
@@ -387,6 +479,8 @@ test.describe.serial("guest workspace cloning and cleanup", () => {
     });
     workspaceIds.push(expired.workspace.id);
     lifecycleIds.push(expired.lifecycle.id);
+    const expiredPersonaUserIds = getClonedPersonaUserIds(expired, source);
+    userIds.push(...expiredPersonaUserIds);
 
     const fresh = await cloneGuestWorkspace({
       admin,
@@ -396,6 +490,7 @@ test.describe.serial("guest workspace cloning and cleanup", () => {
     });
     workspaceIds.push(fresh.workspace.id);
     lifecycleIds.push(fresh.lifecycle.id);
+    userIds.push(...getClonedPersonaUserIds(fresh, source));
 
     const { data: missingLifecycle, error: missingLifecycleError } = await admin
       .from("guest_workspaces")
@@ -425,7 +520,7 @@ test.describe.serial("guest workspace cloning and cleanup", () => {
 
     expect(firstCleanup.scanned).toBe(2);
     expect(firstCleanup.deletedWorkspaces).toBe(1);
-    expect(firstCleanup.deletedAuthUsers).toBe(2);
+    expect(firstCleanup.deletedAuthUsers).toBe(3);
     expect(firstCleanup.errors).toEqual([]);
     expect(authDeletes.sort()).toEqual([expiredGuestId, missingGuestId].sort());
 
@@ -451,11 +546,73 @@ test.describe.serial("guest workspace cloning and cleanup", () => {
     expect(lifecycles?.find((row) => row.id === missingLifecycle!.id)?.deleted_at).toBeTruthy();
     expect(lifecycles?.find((row) => row.id === fresh.lifecycle.id)?.deleted_at).toBeNull();
 
+    const { data: expiredPersonaProfile } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("id", expiredPersonaUserIds[0]!)
+      .maybeSingle();
+    expect(expiredPersonaProfile).toBeNull();
+
     const secondCleanup = await cleanupExpiredGuestWorkspaces({
       admin,
       now: new Date("2026-01-02T01:00:00.000Z"),
       deleteGuestAuthUser: async () => ({ deleted: true, skipped: false }),
     });
     expect(secondCleanup.scanned).toBe(0);
+  });
+
+  test("keeps failed cleanup records retryable", async () => {
+    const retryGuestId = await createUser(`retry-guest-${RUN_ID}@test.flow.dev`, "Retry Guest");
+    const { data: retryLifecycle, error: retryLifecycleError } = await admin
+      .from("guest_workspaces")
+      .insert({
+        workspace_id: null,
+        workspace_slug: `retry-deleted-${RUN_ID}`,
+        source_workspace_id: source.workspace.id,
+        source_workspace_slug: source.workspace.slug,
+        guest_user_id: retryGuestId,
+        created_at: "2026-01-01T00:00:00.000Z",
+        expires_at: "2026-01-01T01:00:00.000Z",
+      })
+      .select()
+      .single();
+    expect(retryLifecycleError).toBeNull();
+    lifecycleIds.push(retryLifecycle!.id);
+
+    const failedCleanup = await cleanupExpiredGuestWorkspaces({
+      admin,
+      now: new Date("2026-01-02T01:00:00.000Z"),
+      deleteGuestAuthUser: async () => {
+        throw new Error("temporary auth outage");
+      },
+    });
+
+    expect(failedCleanup.scanned).toBe(1);
+    expect(failedCleanup.errors).toEqual(["temporary auth outage"]);
+
+    const { data: failedLifecycle } = await admin
+      .from("guest_workspaces")
+      .select("deleted_at, cleanup_error")
+      .eq("id", retryLifecycle!.id)
+      .single();
+    expect(failedLifecycle?.deleted_at).toBeNull();
+    expect(failedLifecycle?.cleanup_error).toContain("temporary auth outage");
+
+    const retriedCleanup = await cleanupExpiredGuestWorkspaces({
+      admin,
+      now: new Date("2026-01-02T02:00:00.000Z"),
+      deleteGuestAuthUser: async () => ({ deleted: true, skipped: false }),
+    });
+
+    expect(retriedCleanup.scanned).toBe(1);
+    expect(retriedCleanup.errors).toEqual([]);
+
+    const { data: retriedLifecycle } = await admin
+      .from("guest_workspaces")
+      .select("deleted_at, cleanup_error")
+      .eq("id", retryLifecycle!.id)
+      .single();
+    expect(retriedLifecycle?.deleted_at).toBeTruthy();
+    expect(retriedLifecycle?.cleanup_error).toBeNull();
   });
 });

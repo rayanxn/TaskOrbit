@@ -7,8 +7,10 @@ export const DEFAULT_GUEST_SOURCE_WORKSPACE_SLUG =
   process.env.GUEST_WORKSPACE_SOURCE_SLUG ?? "pw-workspace";
 
 const GUEST_WORKSPACE_SLUG_PREFIX = "guest-workspace";
+const GUEST_PERSONA_EMAIL_DOMAIN = "guest.flow.local";
 const GUEST_WORKSPACE_LIFETIME_HOURS = 24;
 const MAX_SLUG_ATTEMPTS = 8;
+const FRESH_GUEST_SOURCE_SLUG = "fresh-start";
 
 type AdminClient = SupabaseClient<Database>;
 
@@ -35,6 +37,17 @@ export type CloneGuestWorkspaceResult = {
   lifecycle: Tables<"guest_workspaces">;
   sourceWorkspace: Tables<"workspaces">;
   maps: CloneMaps;
+};
+
+export type CreateFreshGuestWorkspaceInput = {
+  guestUserId: string;
+  now?: Date;
+  admin?: AdminClient;
+};
+
+export type CreateFreshGuestWorkspaceResult = {
+  workspace: Tables<"workspaces">;
+  lifecycle: Tables<"guest_workspaces">;
 };
 
 function addHours(date: Date, hours: number) {
@@ -74,6 +87,27 @@ function mapNullableId(id: string | null, idMap: Map<string, string>) {
   return idMap.get(id) ?? null;
 }
 
+function createGuestPersonaEmail(workspaceSlug: string, index: number) {
+  return `persona-${workspaceSlug}-${index + 1}@${GUEST_PERSONA_EMAIL_DOMAIN}`;
+}
+
+function createGeneratedPassword() {
+  return randomBytes(24).toString("base64url");
+}
+
+function getPersonaDisplayName(
+  profile: Pick<Tables<"profiles">, "full_name" | "email"> | undefined,
+  index: number,
+) {
+  const fullName = profile?.full_name?.trim();
+  if (fullName) return fullName;
+
+  const emailName = profile?.email?.split("@")[0]?.trim();
+  if (emailName) return emailName;
+
+  return `Guest Member ${index + 1}`;
+}
+
 async function loadSourceWorkspace({
   admin,
   sourceWorkspaceId,
@@ -97,11 +131,17 @@ async function loadSourceWorkspace({
 
 async function createUniqueGuestWorkspace({
   admin,
-  sourceWorkspace,
+  template,
   now,
 }: {
   admin: AdminClient;
-  sourceWorkspace: Tables<"workspaces">;
+  template: {
+    name: (suffix: string) => string;
+    issuePrefix: string;
+    issueCounter: number;
+    defaultSprintLength: number;
+    timezone: string;
+  };
   now: Date;
 }) {
   const nowIso = now.toISOString();
@@ -113,12 +153,12 @@ async function createUniqueGuestWorkspace({
     const { data, error } = await admin
       .from("workspaces")
       .insert({
-        name: `Guest Workspace ${suffix.toUpperCase()}`,
+        name: template.name(suffix),
         slug,
-        issue_prefix: sourceWorkspace.issue_prefix,
-        issue_counter: sourceWorkspace.issue_counter,
-        default_sprint_length: sourceWorkspace.default_sprint_length,
-        timezone: sourceWorkspace.timezone,
+        issue_prefix: template.issuePrefix,
+        issue_counter: template.issueCounter,
+        default_sprint_length: template.defaultSprintLength,
+        timezone: template.timezone,
         created_at: nowIso,
         updated_at: nowIso,
       })
@@ -138,6 +178,61 @@ async function createUniqueGuestWorkspace({
   throw new Error(
     `Unable to create a unique guest workspace: ${lastError?.message ?? "unknown error"}`,
   );
+}
+
+async function prepareGuestProfile({
+  admin,
+  guestUserId,
+  workspaceSlug,
+}: {
+  admin: AdminClient;
+  guestUserId: string;
+  workspaceSlug: string;
+}) {
+  const { error } = await admin.from("profiles").upsert(
+    {
+      id: guestUserId,
+      full_name: "Guest User",
+      email: `${workspaceSlug}@${GUEST_PERSONA_EMAIL_DOMAIN}`,
+    },
+    { onConflict: "id" },
+  );
+
+  if (error) {
+    throw new Error(`Unable to prepare guest profile: ${error.message}`);
+  }
+}
+
+async function createGuestLifecycle({
+  admin,
+  clonedWorkspace,
+  sourceWorkspace,
+  sourceWorkspaceSlug,
+  guestUserId,
+  now,
+}: {
+  admin: AdminClient;
+  clonedWorkspace: Tables<"workspaces">;
+  sourceWorkspace?: Tables<"workspaces"> | null;
+  sourceWorkspaceSlug: string;
+  guestUserId: string;
+  now: Date;
+}) {
+  const { data, error } = await admin
+    .from("guest_workspaces")
+    .insert({
+      workspace_id: clonedWorkspace.id,
+      workspace_slug: clonedWorkspace.slug,
+      source_workspace_id: sourceWorkspace?.id ?? null,
+      source_workspace_slug: sourceWorkspace?.slug ?? sourceWorkspaceSlug,
+      guest_user_id: guestUserId,
+      created_at: now.toISOString(),
+      expires_at: addHours(now, GUEST_WORKSPACE_LIFETIME_HOURS).toISOString(),
+    })
+    .select()
+    .single();
+
+  return requireData(data, error, "Unable to create guest lifecycle metadata");
 }
 
 async function insertRows<T extends keyof Database["public"]["Tables"]>(
@@ -164,6 +259,151 @@ function uniqueByUserId(rows: InsertTables<"workspace_members">[]) {
   return [...byUser.values()];
 }
 
+async function loadProfilesById(admin: AdminClient, userIds: string[]) {
+  if (userIds.length === 0) {
+    return new Map<string, Tables<"profiles">>();
+  }
+
+  const { data, error } = await admin
+    .from("profiles")
+    .select("*")
+    .in("id", [...new Set(userIds)]);
+  const profiles = requireData(data, error, "Unable to load source profiles");
+
+  return new Map(profiles.map((profile) => [profile.id, profile]));
+}
+
+async function createGuestPersonaUsers({
+  admin,
+  clonedWorkspace,
+  sourceMemberships,
+  sourceOwnerId,
+  profilesById,
+  userIdMap,
+}: {
+  admin: AdminClient;
+  clonedWorkspace: Tables<"workspaces">;
+  sourceMemberships: Tables<"workspace_members">[];
+  sourceOwnerId: string;
+  profilesById: Map<string, Tables<"profiles">>;
+  userIdMap: Map<string, string>;
+}) {
+  const createdUserIds: string[] = [];
+
+  for (const membership of sourceMemberships) {
+    if (membership.user_id === sourceOwnerId || userIdMap.has(membership.user_id)) {
+      continue;
+    }
+
+    const sourceProfile = profilesById.get(membership.user_id);
+    const email = createGuestPersonaEmail(
+      clonedWorkspace.slug,
+      createdUserIds.length,
+    );
+    const fullName = getPersonaDisplayName(sourceProfile, createdUserIds.length);
+    const { data, error } = await admin.auth.admin.createUser({
+      email,
+      password: createGeneratedPassword(),
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName,
+        guest_persona: true,
+        guest_workspace_id: clonedWorkspace.id,
+        source_user_id: membership.user_id,
+      },
+    });
+
+    if (error || !data.user) {
+      throw new Error(
+        `Unable to create guest persona for source user ${membership.user_id}: ${
+          error?.message ?? "missing user"
+        }`,
+      );
+    }
+
+    createdUserIds.push(data.user.id);
+    userIdMap.set(membership.user_id, data.user.id);
+
+    const { error: profileError } = await admin
+      .from("profiles")
+      .update({
+        full_name: fullName,
+        email,
+        avatar_url: sourceProfile?.avatar_url ?? null,
+      })
+      .eq("id", data.user.id);
+
+    if (profileError) {
+      throw new Error(
+        `Unable to prepare guest persona profile: ${profileError.message}`,
+      );
+    }
+  }
+
+  return createdUserIds;
+}
+
+export async function createFreshGuestWorkspace({
+  guestUserId,
+  now = new Date(),
+  admin = createAdminClient(),
+}: CreateFreshGuestWorkspaceInput): Promise<CreateFreshGuestWorkspaceResult> {
+  const workspace = await createUniqueGuestWorkspace({
+    admin,
+    template: {
+      name: () => "Fresh Workspace",
+      issuePrefix: "FLO",
+      issueCounter: 0,
+      defaultSprintLength: 14,
+      timezone: "UTC",
+    },
+    now,
+  });
+
+  let lifecycle: Tables<"guest_workspaces"> | null = null;
+
+  try {
+    await prepareGuestProfile({
+      admin,
+      guestUserId,
+      workspaceSlug: workspace.slug,
+    });
+
+    lifecycle = await createGuestLifecycle({
+      admin,
+      clonedWorkspace: workspace,
+      sourceWorkspace: null,
+      sourceWorkspaceSlug: FRESH_GUEST_SOURCE_SLUG,
+      guestUserId,
+      now,
+    });
+
+    const { error: membershipError } = await admin
+      .from("workspace_members")
+      .insert({
+        id: randomUUID(),
+        workspace_id: workspace.id,
+        user_id: guestUserId,
+        role: "owner",
+        created_at: now.toISOString(),
+        updated_at: now.toISOString(),
+      });
+
+    if (membershipError) {
+      throw new Error(`Unable to create guest workspace owner: ${membershipError.message}`);
+    }
+
+    return { workspace, lifecycle };
+  } catch (error) {
+    if (lifecycle) {
+      await admin.from("guest_workspaces").delete().eq("id", lifecycle.id);
+    }
+
+    await admin.from("workspaces").delete().eq("id", workspace.id);
+    throw error;
+  }
+}
+
 export async function cloneGuestWorkspace({
   guestUserId,
   sourceWorkspaceSlug = DEFAULT_GUEST_SOURCE_WORKSPACE_SLUG,
@@ -179,47 +419,33 @@ export async function cloneGuestWorkspace({
 
   const clonedWorkspace = await createUniqueGuestWorkspace({
     admin,
-    sourceWorkspace,
+    template: {
+      name: (suffix) => `Guest Workspace ${suffix.toUpperCase()}`,
+      issuePrefix: sourceWorkspace.issue_prefix,
+      issueCounter: sourceWorkspace.issue_counter,
+      defaultSprintLength: sourceWorkspace.default_sprint_length,
+      timezone: sourceWorkspace.timezone,
+    },
     now,
   });
 
   let lifecycle: Tables<"guest_workspaces"> | null = null;
+  let createdPersonaUserIds: string[] = [];
 
   try {
-    const expiresAt = addHours(now, GUEST_WORKSPACE_LIFETIME_HOURS).toISOString();
-
-    const { error: profileError } = await admin.from("profiles").upsert(
-      {
-        id: guestUserId,
-        full_name: "Guest User",
-        email: `${clonedWorkspace.slug}@guest.flow.local`,
-      },
-      { onConflict: "id" },
-    );
-
-    if (profileError) {
-      throw new Error(`Unable to prepare guest profile: ${profileError.message}`);
-    }
-
-    const { data: lifecycleData, error: lifecycleError } = await admin
-      .from("guest_workspaces")
-      .insert({
-        workspace_id: clonedWorkspace.id,
-        workspace_slug: clonedWorkspace.slug,
-        source_workspace_id: sourceWorkspace.id,
-        source_workspace_slug: sourceWorkspace.slug,
-        guest_user_id: guestUserId,
-        created_at: now.toISOString(),
-        expires_at: expiresAt,
-      })
-      .select()
-      .single();
-
-    lifecycle = requireData(
-      lifecycleData,
-      lifecycleError,
-      "Unable to create guest lifecycle metadata",
-    );
+    await prepareGuestProfile({
+      admin,
+      guestUserId,
+      workspaceSlug: clonedWorkspace.slug,
+    });
+    lifecycle = await createGuestLifecycle({
+      admin,
+      clonedWorkspace,
+      sourceWorkspace,
+      sourceWorkspaceSlug: sourceWorkspace.slug,
+      guestUserId,
+      now,
+    });
 
     const [
       sourceMembershipsResult,
@@ -290,6 +516,19 @@ export async function cloneGuestWorkspace({
     }
 
     const userIdMap = new Map<string, string>([[sourceOwner.user_id, guestUserId]]);
+    const profilesById = await loadProfilesById(
+      admin,
+      sourceMemberships.map((membership) => membership.user_id),
+    );
+    createdPersonaUserIds = await createGuestPersonaUsers({
+      admin,
+      clonedWorkspace,
+      sourceMemberships,
+      sourceOwnerId: sourceOwner.user_id,
+      profilesById,
+      userIdMap,
+    });
+
     const mapUserId = (userId: string | null) => {
       if (!userId) return null;
       return userIdMap.get(userId) ?? userId;
@@ -545,6 +784,11 @@ export async function cloneGuestWorkspace({
     }
 
     await admin.from("workspaces").delete().eq("id", clonedWorkspace.id);
+    await Promise.all(
+      createdPersonaUserIds.map((userId) =>
+        admin.auth.admin.deleteUser(userId).catch(() => undefined),
+      ),
+    );
     throw error;
   }
 }

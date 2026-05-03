@@ -3,6 +3,7 @@ import { createAdminClient } from "../supabase/admin";
 import type { Database } from "../types";
 
 type AdminClient = SupabaseClient<Database>;
+const GUEST_PERSONA_EMAIL_DOMAIN = "guest.flow.local";
 
 export type DeleteGuestAuthUserResult = {
   deleted: boolean;
@@ -34,6 +35,30 @@ function isMissingUserError(error: { message?: string; status?: number } | null)
   return error?.status === 404 || message.includes("not found");
 }
 
+function isGuestPersonaEmail(email: string | null | undefined) {
+  const normalizedEmail = email?.toLowerCase();
+  return (
+    normalizedEmail?.startsWith("persona-") &&
+    normalizedEmail.endsWith(`@${GUEST_PERSONA_EMAIL_DOMAIN}`)
+  ) ?? false;
+}
+
+async function loadGuestPersonaUserIds(
+  admin: AdminClient,
+  workspaceSlug: string,
+) {
+  const { data, error } = await admin
+    .from("profiles")
+    .select("id")
+    .like("email", `persona-${workspaceSlug}-%@${GUEST_PERSONA_EMAIL_DOMAIN}`);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map((profile) => profile.id);
+}
+
 export async function deleteAnonymousGuestAuthUser(
   guestUserId: string,
   admin: AdminClient,
@@ -53,6 +78,40 @@ export async function deleteAnonymousGuestAuthUser(
   }
 
   const { error: deleteError } = await admin.auth.admin.deleteUser(guestUserId);
+  if (deleteError) {
+    if (isMissingUserError(deleteError)) {
+      return { deleted: false, skipped: true, reason: "missing" };
+    }
+
+    throw new Error(deleteError.message);
+  }
+
+  return { deleted: true, skipped: false };
+}
+
+export async function deleteGuestPersonaAuthUser(
+  userId: string,
+  admin: AdminClient,
+): Promise<DeleteGuestAuthUserResult> {
+  const { data: profile, error: profileError } = await admin
+    .from("profiles")
+    .select("email")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (profileError) {
+    throw new Error(profileError.message);
+  }
+
+  if (!profile) {
+    return { deleted: false, skipped: true, reason: "missing_profile" };
+  }
+
+  if (!isGuestPersonaEmail(profile.email)) {
+    return { deleted: false, skipped: true, reason: "not_guest_persona" };
+  }
+
+  const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
   if (deleteError) {
     if (isMissingUserError(deleteError)) {
       return { deleted: false, skipped: true, reason: "missing" };
@@ -92,6 +151,7 @@ export async function cleanupExpiredGuestWorkspaces({
   for (const guestWorkspace of guestWorkspaces ?? []) {
     result.scanned += 1;
     const cleanupErrors: string[] = [];
+    let workspaceRemoved = !guestWorkspace.workspace_id;
 
     if (guestWorkspace.workspace_id) {
       const { error: deleteWorkspaceError } = await admin
@@ -103,32 +163,69 @@ export async function cleanupExpiredGuestWorkspaces({
         cleanupErrors.push(deleteWorkspaceError.message);
       } else {
         result.deletedWorkspaces += 1;
+        workspaceRemoved = true;
       }
     }
 
-    try {
-      const authResult = await deleteGuestAuthUser(
-        guestWorkspace.guest_user_id,
-        admin,
-      );
+    if (workspaceRemoved) {
+      try {
+        const authResult = await deleteGuestAuthUser(
+          guestWorkspace.guest_user_id,
+          admin,
+        );
 
-      if (authResult.deleted) {
-        result.deletedAuthUsers += 1;
+        if (authResult.deleted) {
+          result.deletedAuthUsers += 1;
+        }
+
+        if (authResult.skipped) {
+          result.skippedAuthUsers += 1;
+        }
+      } catch (authError) {
+        cleanupErrors.push(
+          authError instanceof Error ? authError.message : String(authError),
+        );
       }
 
-      if (authResult.skipped) {
-        result.skippedAuthUsers += 1;
+      let personaUserIds: string[] = [];
+      try {
+        personaUserIds = await loadGuestPersonaUserIds(
+          admin,
+          guestWorkspace.workspace_slug,
+        );
+      } catch (authError) {
+        cleanupErrors.push(
+          authError instanceof Error ? authError.message : String(authError),
+        );
       }
-    } catch (authError) {
-      cleanupErrors.push(
-        authError instanceof Error ? authError.message : String(authError),
-      );
+
+      for (const personaUserId of personaUserIds) {
+        try {
+          const personaResult = await deleteGuestPersonaAuthUser(
+            personaUserId,
+            admin,
+          );
+
+          if (personaResult.deleted) {
+            result.deletedAuthUsers += 1;
+          }
+
+          if (personaResult.skipped) {
+            result.skippedAuthUsers += 1;
+          }
+        } catch (authError) {
+          cleanupErrors.push(
+            authError instanceof Error ? authError.message : String(authError),
+          );
+        }
+      }
     }
 
+    const cleanupSucceeded = cleanupErrors.length === 0;
     const { error: metadataError } = await admin
       .from("guest_workspaces")
       .update({
-        deleted_at: nowIso,
+        deleted_at: cleanupSucceeded ? nowIso : null,
         cleanup_error: cleanupErrors.length > 0 ? cleanupErrors.join("; ") : null,
       })
       .eq("id", guestWorkspace.id);

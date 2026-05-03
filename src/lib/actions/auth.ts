@@ -4,7 +4,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ActionResponse } from "@/lib/types";
-import { cloneGuestWorkspace } from "@/lib/guest/workspace-clone";
+import {
+  cloneGuestWorkspace,
+  createFreshGuestWorkspace,
+} from "@/lib/guest/workspace-clone";
 import { buildAuthRedirectUrl, normalizeRedirectPath } from "@/lib/utils/redirect-path";
 import {
   resolvePostAuthRedirect,
@@ -64,8 +67,15 @@ export async function signIn(formData: FormData): Promise<ActionResponse> {
   redirect(await resolvePostAuthRedirect(nextPath));
 }
 
-export async function continueAsGuest(): Promise<ActionResponse> {
+type GuestMode = "demo" | "fresh";
+
+function getGuestMode(formData?: FormData): GuestMode {
+  return formData?.get("mode") === "fresh" ? "fresh" : "demo";
+}
+
+export async function continueAsGuest(formData?: FormData): Promise<ActionResponse> {
   const supabase = await createClient();
+  const mode = getGuestMode(formData);
 
   const { data, error } = await supabase.auth.signInAnonymously({
     options: {
@@ -81,13 +91,20 @@ export async function continueAsGuest(): Promise<ActionResponse> {
     };
   }
 
-  let workspaceSlug: string;
+  let redirectPath: string;
 
   try {
-    const { workspace } = await cloneGuestWorkspace({
-      guestUserId: data.user.id,
-    });
-    workspaceSlug = workspace.slug;
+    if (mode === "fresh") {
+      const { workspace } = await createFreshGuestWorkspace({
+        guestUserId: data.user.id,
+      });
+      redirectPath = `/${workspace.slug}/projects`;
+    } else {
+      const { workspace } = await cloneGuestWorkspace({
+        guestUserId: data.user.id,
+      });
+      redirectPath = `/${workspace.slug}/dashboard`;
+    }
   } catch {
     await supabase.auth.signOut();
 
@@ -102,7 +119,7 @@ export async function continueAsGuest(): Promise<ActionResponse> {
     };
   }
 
-  redirect(`/${workspaceSlug}/dashboard`);
+  redirect(redirectPath);
 }
 
 export async function signOut(): Promise<void> {
