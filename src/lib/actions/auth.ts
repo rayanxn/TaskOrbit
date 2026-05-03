@@ -2,7 +2,12 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { ActionResponse } from "@/lib/types";
+import {
+  cloneGuestWorkspace,
+  createFreshGuestWorkspace,
+} from "@/lib/guest/workspace-clone";
 import { buildAuthRedirectUrl, normalizeRedirectPath } from "@/lib/utils/redirect-path";
 import {
   resolvePostAuthRedirect,
@@ -60,6 +65,61 @@ export async function signIn(formData: FormData): Promise<ActionResponse> {
   }
 
   redirect(await resolvePostAuthRedirect(nextPath));
+}
+
+type GuestMode = "demo" | "fresh";
+
+function getGuestMode(formData?: FormData): GuestMode {
+  return formData?.get("mode") === "fresh" ? "fresh" : "demo";
+}
+
+export async function continueAsGuest(formData?: FormData): Promise<ActionResponse> {
+  const supabase = await createClient();
+  const mode = getGuestMode(formData);
+
+  const { data, error } = await supabase.auth.signInAnonymously({
+    options: {
+      data: { full_name: "Guest User" },
+    },
+  });
+
+  if (error || !data.user) {
+    return {
+      error:
+        error?.message ??
+        "Unable to start guest mode. Please try again in a moment.",
+    };
+  }
+
+  let redirectPath: string;
+
+  try {
+    if (mode === "fresh") {
+      const { workspace } = await createFreshGuestWorkspace({
+        guestUserId: data.user.id,
+      });
+      redirectPath = `/${workspace.slug}/projects`;
+    } else {
+      const { workspace } = await cloneGuestWorkspace({
+        guestUserId: data.user.id,
+      });
+      redirectPath = `/${workspace.slug}/dashboard`;
+    }
+  } catch {
+    await supabase.auth.signOut();
+
+    try {
+      await createAdminClient().auth.admin.deleteUser(data.user.id);
+    } catch {
+      // Best-effort cleanup; the lifecycle cleanup job handles abandoned users.
+    }
+
+    return {
+      error: "Unable to prepare guest workspace. Please try again.",
+    };
+  }
+
+  redirect(redirectPath);
 }
 
 export async function signOut(): Promise<void> {

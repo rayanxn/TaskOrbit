@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Github } from "lucide-react";
 import { signIn, signInWithOAuth } from "@/lib/actions/auth";
 import type { ActionResponse } from "@/lib/types";
+import { GuestModeChooser } from "../guest-mode-chooser";
 
 function LoginPageContent() {
   const searchParams = useSearchParams();
@@ -91,6 +92,8 @@ function LoginPageContent() {
           {pending ? "Signing In..." : "Sign In"}
         </button>
       </form>
+
+      <GuestModeChooser disabled={pending} />
 
       {/* Divider */}
       <div className="flex items-center gap-4 my-6">
