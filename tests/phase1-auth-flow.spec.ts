@@ -82,8 +82,8 @@ test.describe.serial("Phase 1: Auth → Onboarding → Board", () => {
     await expect(page.getByLabel(/email/i)).toBeVisible();
     await expect(page.getByLabel(/password/i)).toBeVisible();
     await expect(page.getByRole("button", { name: "Sign In" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /google/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /github/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /google/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /github/i })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Sign up" })).toBeVisible();
   });
 
@@ -97,6 +97,8 @@ test.describe.serial("Phase 1: Auth → Onboarding → Board", () => {
     await expect(
       page.getByRole("button", { name: "Create Account" })
     ).toBeVisible();
+    await expect(page.getByRole("button", { name: /google/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /github/i })).toHaveCount(0);
   });
 
   test("3. Log in → redirected to onboarding", async ({ page }) => {

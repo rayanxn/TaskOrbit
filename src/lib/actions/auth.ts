@@ -8,7 +8,7 @@ import {
   cloneGuestWorkspace,
   createFreshGuestWorkspace,
 } from "@/lib/guest/workspace-clone";
-import { buildAuthRedirectUrl, normalizeRedirectPath } from "@/lib/utils/redirect-path";
+import { buildAuthRedirectUrl } from "@/lib/utils/redirect-path";
 import {
   resolvePostAuthRedirect,
 } from "@/lib/utils/auth-redirect";
@@ -174,30 +174,4 @@ export async function resetPassword(
   }
 
   redirect("/login");
-}
-
-export async function signInWithOAuth(
-  provider: "google" | "github",
-  nextPath?: string | null,
-) {
-  const supabase = await createClient();
-  const redirectUrl = new URL("/callback", process.env.NEXT_PUBLIC_APP_URL);
-  const safeNextPath = normalizeRedirectPath(nextPath);
-
-  if (safeNextPath) {
-    redirectUrl.searchParams.set("next", safeNextPath);
-  }
-
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider,
-    options: {
-      redirectTo: redirectUrl.toString(),
-    },
-  });
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  redirect(data.url);
 }
