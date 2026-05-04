@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -19,6 +19,7 @@ import { updateIssue } from "@/lib/actions/issues";
 import { STATUS_ORDER } from "@/lib/utils/statuses";
 import { BoardColumn } from "./board-column";
 import { BoardCard } from "./board-card";
+import { useOptionalPresence } from "@/providers/presence-provider";
 import type { IssueStatus } from "@/lib/types";
 import type { IssueWithDetails } from "@/lib/queries/issues";
 
@@ -88,9 +89,44 @@ export function BoardView({
   onIssueClick,
   issueFilter,
 }: BoardViewProps) {
+  const presence = useOptionalPresence();
+  const [flashingIds, setFlashingIds] = useState<Set<string>>(() => new Set());
+  const flashTimers = useRef<Map<string, number>>(new Map());
+
+  const handleRemoteUpdate = useCallback((issueId: string) => {
+    setFlashingIds((prev) => {
+      if (prev.has(issueId)) return prev;
+      const next = new Set(prev);
+      next.add(issueId);
+      return next;
+    });
+    const existing = flashTimers.current.get(issueId);
+    if (existing) window.clearTimeout(existing);
+    const timer = window.setTimeout(() => {
+      setFlashingIds((prev) => {
+        if (!prev.has(issueId)) return prev;
+        const next = new Set(prev);
+        next.delete(issueId);
+        return next;
+      });
+      flashTimers.current.delete(issueId);
+    }, 700);
+    flashTimers.current.set(issueId, timer);
+  }, []);
+
+  useEffect(() => {
+    const timers = flashTimers.current;
+    return () => {
+      for (const t of timers.values()) window.clearTimeout(t);
+      timers.clear();
+    };
+  }, []);
+
   const { issues, setIssues } = useRealtimeIssues({
     projectId,
     initialIssues,
+    isSelfUpdate: presence?.isSelfUpdate,
+    onRemoteUpdate: handleRemoteUpdate,
   });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [quickAddStatus, setQuickAddStatus] = useState<IssueStatus | null>(null);
@@ -167,10 +203,12 @@ export function BoardView({
 
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
-      setActiveId(event.active.id as string);
+      const id = event.active.id as string;
+      setActiveId(id);
       issuesSnapshot.current = issues.map((i) => ({ ...i }));
+      presence?.broadcastDragStart(id);
     },
-    [issues],
+    [issues, presence],
   );
 
   const handleDragOver = useCallback(
@@ -204,91 +242,104 @@ export function BoardView({
     async (event: DragEndEvent) => {
       const { active, over } = event;
       setActiveId(null);
-
-      if (!over) return;
-
       const activeIssueId = active.id as string;
-      const activeIssue = hierarchyIssues.find((i) => i.id === activeIssueId);
-      if (!activeIssue) return;
 
-      const targetColumn = findColumnOfOver(
-        over.id,
-        hierarchyIssues,
-        over.data?.current as Record<string, unknown> | undefined,
-      );
-      if (!targetColumn) return;
+      try {
+        if (!over) return;
 
-      const newStatus = targetColumn;
-      const columnIssues = hierarchyIssues
-        .filter((i) => i.status === newStatus && i.id !== activeIssueId)
-        .sort((a, b) => a.sort_order - b.sort_order);
+        const activeIssue = hierarchyIssues.find((i) => i.id === activeIssueId);
+        if (!activeIssue) return;
 
-      // Determine target index
-      let targetIndex = columnIssues.length; // default: end of column
-      if (over.id !== newStatus) {
-        // Dropped on a specific card — find its index
-        const overIdx = columnIssues.findIndex((i) => i.id === over.id);
-        if (overIdx !== -1) {
-          targetIndex = overIdx;
-        }
-      }
+        const targetColumn = findColumnOfOver(
+          over.id,
+          hierarchyIssues,
+          over.data?.current as Record<string, unknown> | undefined,
+        );
+        if (!targetColumn) return;
 
-      const newSortOrder = calculateSortOrder(columnIssues, targetIndex);
-
-      // Optimistic local update
-      setIssues((prev) =>
-        prev.map((i) =>
-          i.id === activeIssueId
-            ? { ...i, status: newStatus, sort_order: newSortOrder }
-            : i,
-        ),
-      );
-
-      // Persist
-      const result = await updateIssue(activeIssueId, {
-        status: newStatus,
-        sort_order: newSortOrder,
-      });
-
-      if (result.error) {
-        // Rollback
-        setIssues(issuesSnapshot.current);
-        return;
-      }
-
-      // Rebalance if needed
-      if (needsRebalance(columnIssues, targetIndex)) {
-        const allColumnIssues = hierarchyIssues
-          .filter((i) => i.status === newStatus || i.id === activeIssueId)
-          .filter((i) => i.status === newStatus)
+        const newStatus = targetColumn;
+        const columnIssues = hierarchyIssues
+          .filter((i) => i.status === newStatus && i.id !== activeIssueId)
           .sort((a, b) => a.sort_order - b.sort_order);
 
-        const rebalancePromises = allColumnIssues.map((issue, idx) =>
-          updateIssue(issue.id, { sort_order: (idx + 1) * 1000 }),
-        );
-        await Promise.all(rebalancePromises);
+        // Determine target index
+        let targetIndex = columnIssues.length; // default: end of column
+        if (over.id !== newStatus) {
+          // Dropped on a specific card — find its index
+          const overIdx = columnIssues.findIndex((i) => i.id === over.id);
+          if (overIdx !== -1) {
+            targetIndex = overIdx;
+          }
+        }
 
-        // Update local state with rebalanced orders
+        const newSortOrder = calculateSortOrder(columnIssues, targetIndex);
+
+        // Optimistic local update
         setIssues((prev) =>
-          prev.map((i) => {
-            const rebalancedIdx = allColumnIssues.findIndex(
-              (ri) => ri.id === i.id,
-            );
-            if (rebalancedIdx !== -1) {
-              return { ...i, sort_order: (rebalancedIdx + 1) * 1000 };
-            }
-            return i;
-          }),
+          prev.map((i) =>
+            i.id === activeIssueId
+              ? { ...i, status: newStatus, sort_order: newSortOrder }
+              : i,
+          ),
         );
+
+        // Mark before the network call so the realtime UPDATE round-trip
+        // is treated as self-originated.
+        presence?.markSelfUpdated(activeIssueId);
+
+        // Persist
+        const result = await updateIssue(activeIssueId, {
+          status: newStatus,
+          sort_order: newSortOrder,
+        });
+
+        if (result.error) {
+          // Rollback
+          setIssues(issuesSnapshot.current);
+          return;
+        }
+
+        // Rebalance if needed
+        if (needsRebalance(columnIssues, targetIndex)) {
+          const allColumnIssues = hierarchyIssues
+            .filter((i) => i.status === newStatus || i.id === activeIssueId)
+            .filter((i) => i.status === newStatus)
+            .sort((a, b) => a.sort_order - b.sort_order);
+
+          for (const issue of allColumnIssues) {
+            presence?.markSelfUpdated(issue.id);
+          }
+          const rebalancePromises = allColumnIssues.map((issue, idx) =>
+            updateIssue(issue.id, { sort_order: (idx + 1) * 1000 }),
+          );
+          await Promise.all(rebalancePromises);
+
+          // Update local state with rebalanced orders
+          setIssues((prev) =>
+            prev.map((i) => {
+              const rebalancedIdx = allColumnIssues.findIndex(
+                (ri) => ri.id === i.id,
+              );
+              if (rebalancedIdx !== -1) {
+                return { ...i, sort_order: (rebalancedIdx + 1) * 1000 };
+              }
+              return i;
+            }),
+          );
+        }
+      } finally {
+        presence?.broadcastDragEnd(activeIssueId);
       }
     },
-    [hierarchyIssues, setIssues],
+    [hierarchyIssues, setIssues, presence],
   );
 
   const handleDragCancel = useCallback(() => {
+    const cancelledId = activeId;
     setActiveId(null);
     setIssues(issuesSnapshot.current);
-  }, [setIssues]);
+    if (cancelledId) presence?.broadcastDragEnd(cancelledId);
+  }, [activeId, setIssues, presence]);
 
   const handleQuickAddCreated = useCallback(() => {
     setQuickAddStatus(null);
@@ -318,6 +369,9 @@ export function BoardView({
             onQuickAddCreated={handleQuickAddCreated}
             onIssueClick={onIssueClick}
             onParentClick={onIssueClick}
+            peersByIssue={presence?.peersByIssue}
+            draggingByIssue={presence?.draggingByIssue}
+            flashingIds={flashingIds}
           />
         ))}
       </div>

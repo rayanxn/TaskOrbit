@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useWorkspace } from "@/providers/workspace-provider";
+import { useOptionalPresence } from "@/providers/presence-provider";
 import { createIssue } from "@/lib/actions/issues";
 import { PRIORITY_CONFIG } from "@/lib/utils/priorities";
 import { cn } from "@/lib/utils/cn";
@@ -25,6 +26,7 @@ export function BoardQuickAdd({
   onCreated,
 }: BoardQuickAddProps) {
   const { workspace } = useWorkspace();
+  const presence = useOptionalPresence();
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -56,6 +58,7 @@ export function BoardQuickAdd({
     setLoading(false);
 
     if (!result.error && "data" in result && result.data) {
+      presence?.markSelfUpdated(result.data.id);
       toast.success(`Issue ${result.data.issue_key} created`);
       onCreated();
       router.refresh();

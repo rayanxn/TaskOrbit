@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type {
   IssueParentSummary,
@@ -11,6 +11,11 @@ import type { Tables } from "@/lib/types";
 interface UseRealtimeIssuesOptions {
   projectId: string;
   initialIssues: IssueWithDetails[];
+  /** Returns true when the given UPDATE was triggered by the current client
+   *  (so it should NOT trigger a remote-update flash). */
+  isSelfUpdate?: (issueId: string) => boolean;
+  /** Fires when an UPDATE arrives that did NOT originate from this client. */
+  onRemoteUpdate?: (issueId: string) => void;
 }
 
 function toParentSummary(
@@ -26,6 +31,8 @@ function toParentSummary(
 export function useRealtimeIssues({
   projectId,
   initialIssues,
+  isSelfUpdate,
+  onRemoteUpdate,
 }: UseRealtimeIssuesOptions) {
   const [issues, setIssues] = useState<IssueWithDetails[]>(initialIssues);
 
@@ -33,6 +40,19 @@ export function useRealtimeIssues({
   useEffect(() => {
     setIssues(initialIssues);
   }, [initialIssues]);
+
+  const isSelfUpdateRef = useRef<UseRealtimeIssuesOptions["isSelfUpdate"]>(
+    isSelfUpdate,
+  );
+  const onRemoteUpdateRef = useRef<UseRealtimeIssuesOptions["onRemoteUpdate"]>(
+    onRemoteUpdate,
+  );
+  useEffect(() => {
+    isSelfUpdateRef.current = isSelfUpdate;
+  }, [isSelfUpdate]);
+  useEffect(() => {
+    onRemoteUpdateRef.current = onRemoteUpdate;
+  }, [onRemoteUpdate]);
 
   const handleInsert = useCallback(
     (payload: { new: Tables<"issues"> }) => {
@@ -62,6 +82,10 @@ export function useRealtimeIssues({
   const handleUpdate = useCallback(
     (payload: { new: Tables<"issues"> }) => {
       const row = payload.new;
+      const isSelfOriginated = isSelfUpdateRef.current?.(row.id) ?? false;
+      if (!isSelfOriginated) {
+        onRemoteUpdateRef.current?.(row.id);
+      }
       setIssues((prev) => {
         const parentIssue = row.parent_id
           ? prev.find((issue) => issue.id === row.parent_id)

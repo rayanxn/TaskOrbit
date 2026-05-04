@@ -2,7 +2,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils/cn";
 import { PRIORITY_CONFIG } from "@/lib/utils/priorities";
 import { formatDate } from "@/lib/utils/dates";
+import { WatcherDots } from "@/components/presence/watcher-dots";
 import type { IssuePriority } from "@/lib/types";
+import type { Peer } from "@/lib/hooks/use-presence-channel";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface IssueRowProps {
@@ -19,6 +21,8 @@ interface IssueRowProps {
   hasChildren?: boolean;
   expanded?: boolean;
   onToggleExpand?: (id: string) => void;
+  watchers?: Peer[];
+  isRemoteFlashing?: boolean;
 }
 
 export function IssueRow({
@@ -35,6 +39,8 @@ export function IssueRow({
   hasChildren = false,
   expanded = false,
   onToggleExpand,
+  watchers,
+  isRemoteFlashing = false,
 }: IssueRowProps) {
   const priorityConfig = PRIORITY_CONFIG[priority as IssuePriority];
   const isDone = status === "done";
@@ -57,7 +63,11 @@ export function IssueRow({
     <>
       <div
         onClick={() => onClick?.(id)}
-        className="cursor-pointer rounded-xl border border-border bg-surface px-4 py-3.5 shadow-sm transition-colors hover:bg-surface-hover/70 sm:hidden"
+        data-issue-id={id}
+        className={cn(
+          "cursor-pointer rounded-xl border border-border bg-surface px-4 py-3.5 shadow-sm transition-colors duration-700 hover:bg-surface-hover/70 sm:hidden",
+          isRemoteFlashing && "bg-primary/5",
+        )}
       >
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex items-center gap-1.5">
@@ -123,6 +133,9 @@ export function IssueRow({
                   {isDone ? dueDateDisplay : `Due ${dueDateDisplay}`}
                 </span>
               )}
+              {watchers && watchers.length > 0 && (
+                <WatcherDots peers={watchers} className="ml-auto" />
+              )}
             </div>
           </div>
         </div>
@@ -130,7 +143,11 @@ export function IssueRow({
 
       <div
         onClick={() => onClick?.(id)}
-        className="group hidden cursor-pointer items-center gap-3 border-b border-border px-6 py-2.5 transition-colors last:border-b-0 hover:bg-surface-hover/50 sm:flex"
+        data-issue-id={id}
+        className={cn(
+          "group hidden cursor-pointer items-center gap-3 border-b border-border px-6 py-2.5 transition-colors duration-700 last:border-b-0 hover:bg-surface-hover/50 sm:flex",
+          isRemoteFlashing && "bg-primary/5",
+        )}
       >
         <div className="flex items-center gap-2 shrink-0">
           {hasChildren ? (
@@ -160,6 +177,9 @@ export function IssueRow({
         <div className="flex min-w-0 flex-1 items-center gap-2" style={{ paddingLeft: indent }}>
           {depth > 0 && <span className="h-5 w-px shrink-0 bg-border" />}
           <span className="text-sm text-text truncate">{title}</span>
+          {watchers && watchers.length > 0 && (
+            <WatcherDots peers={watchers} className="shrink-0" />
+          )}
         </div>
 
         {/* Project */}
